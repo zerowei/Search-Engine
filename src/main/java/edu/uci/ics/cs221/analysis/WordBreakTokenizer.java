@@ -43,6 +43,8 @@ public class WordBreakTokenizer implements Tokenizer {
             List<String> dictLines = Files.readAllLines(Paths.get(dictResource.toURI()));
             for (String dict : dictLines){
                 List<String> WordsFreq = Arrays.asList(dict.toLowerCase().split(" "));
+                // Hack to deal with the invisible char at the beginning of the file
+                // Related Slack message is at https://uci-cs221-s19.slack.com/archives/CHM5W2K6G/p1554440079005900
                 if (WordsFreq.get(0).startsWith("\uFEFF")){
                     WordsFreq.set(0, WordsFreq.get(0).substring(1));
                 }
