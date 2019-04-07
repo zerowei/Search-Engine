@@ -2,7 +2,7 @@
 
 ## Team Member
 
-* Tianyi WEI (xxxxxxxx)
+* Tianyi WEI (91643717)
 * Rui GUO (47407667)
 
 ## CS221 Project - Peterman Search Engine
