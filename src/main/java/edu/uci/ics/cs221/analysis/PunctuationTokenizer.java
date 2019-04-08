@@ -33,9 +33,10 @@ public class PunctuationTokenizer implements Tokenizer {
                 String token = (String) Initial;
                 for (Object obj : punctuations) {
                     String punctuation = (String) obj;
-                    token = token.replace(punctuation, "");
+                    token = token.replace(punctuation, " ");
                 }
-                tokens.add(token);
+                List<String> result = Arrays.asList(token.split("\\s+"));
+                tokens.addAll(result);
             }
         }
         else {
