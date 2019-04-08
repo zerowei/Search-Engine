@@ -57,6 +57,8 @@ public class WordBreakTokenizer implements Tokenizer {
     }
 
     public List<String> tokenize(String text) {
+        if (text.length()==0)
+            return new ArrayList<>();
         int length = text.length();
         String LowerText = text.toLowerCase();
         Boolean[][] D = new Boolean[length][length];
@@ -77,7 +79,6 @@ public class WordBreakTokenizer implements Tokenizer {
                 }
             }
         }
-        System.out.println(D[0][length-1]);
         if ( !D[0][length-1] )
             throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
         wordBreakResult(LowerText, hm, 0, D, path, result);
