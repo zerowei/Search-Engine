@@ -35,6 +35,10 @@ import java.util.*;
 public class WordBreakTokenizer implements Tokenizer {
 
     public HashMap hm = new HashMap();
+    public static Set<String> punctuations = new HashSet<>();
+    static {
+        punctuations.addAll(Arrays.asList(",", ".", ";", "?", "!"));
+    }
 
     public WordBreakTokenizer() {
         try {
@@ -59,6 +63,10 @@ public class WordBreakTokenizer implements Tokenizer {
     public List<String> tokenize(String text) {
         if (text.length()==0)
             return new ArrayList<>();
+        for (String str: punctuations){
+            if (text.contains(str))
+                throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
+        }
         int length = text.length();
         String LowerText = text.toLowerCase();
         Boolean[][] D = new Boolean[length][length];
