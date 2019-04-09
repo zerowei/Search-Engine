@@ -41,15 +41,13 @@ public class Team11WordBreakTokenizerTest {
         assert(false);
     }
 
-    // Test with a normal case: it can be tokenized
+    // Test with a normal case: it can be tokenized with the highest probability
     @Test
     public void test4() {
         String text = "searchnewtimeuse";
         List<String> expected = Arrays.asList("search", "new", "time", "use");
         WordBreakTokenizer tokenizer = new WordBreakTokenizer();
-        tokenizer.tokenize(text);
-        // An exception should be thrown above, and the program should never reach the next line
-        assert(false);
+        assertEquals(expected, tokenizer.tokenize(text));
     }
 
     // Test with a few upper cases
@@ -58,9 +56,7 @@ public class Team11WordBreakTokenizerTest {
         String text = "seaRchneWtiMeuSe";
         List<String> expected = Arrays.asList("search", "new", "time", "use");
         WordBreakTokenizer tokenizer = new WordBreakTokenizer();
-        tokenizer.tokenize(text);
-        // An exception should be thrown above, and the program should never reach the next line
-        assert(false);
+        assertEquals(expected, tokenizer.tokenize(text));
     }
 
     // Test with all upper cases
@@ -69,9 +65,7 @@ public class Team11WordBreakTokenizerTest {
         String text = "SEARCHNEWTIMEUSE";
         List<String> expected = Arrays.asList("search", "new", "time", "use");
         WordBreakTokenizer tokenizer = new WordBreakTokenizer();
-        tokenizer.tokenize(text);
-        // An exception should be thrown above, and the program should never reach the next line
-        assert(false);
+        assertEquals(expected, tokenizer.tokenize(text));
     }
 
     // Test with stop word at the beginning
@@ -80,9 +74,7 @@ public class Team11WordBreakTokenizerTest {
         String text = "thesearchnewtimeuse";
         List<String> expected = Arrays.asList("search", "new", "time", "use");
         WordBreakTokenizer tokenizer = new WordBreakTokenizer();
-        tokenizer.tokenize(text);
-        // An exception should be thrown above, and the program should never reach the next line
-        assert(false);
+        assertEquals(expected, tokenizer.tokenize(text));
     }
 
     // Test with stop word in the middle
@@ -91,9 +83,7 @@ public class Team11WordBreakTokenizerTest {
         String text = "searchthenewtimeuse";
         List<String> expected = Arrays.asList("search", "new", "time", "use");
         WordBreakTokenizer tokenizer = new WordBreakTokenizer();
-        tokenizer.tokenize(text);
-        // An exception should be thrown above, and the program should never reach the next line
-        assert(false);
+        assertEquals(expected, tokenizer.tokenize(text));
     }
 
     // Test with stop word in the end
@@ -102,8 +92,6 @@ public class Team11WordBreakTokenizerTest {
         String text = "searchnewtimeusethe";
         List<String> expected = Arrays.asList("search", "new", "time", "use");
         WordBreakTokenizer tokenizer = new WordBreakTokenizer();
-        tokenizer.tokenize(text);
-        // An exception should be thrown above, and the program should never reach the next line
-        assert(false);
+        assertEquals(expected, tokenizer.tokenize(text));
     }
 }
