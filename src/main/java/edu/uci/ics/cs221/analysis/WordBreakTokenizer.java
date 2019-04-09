@@ -34,8 +34,9 @@ import java.util.*;
  */
 public class WordBreakTokenizer implements Tokenizer {
 
-    public HashMap hm = new HashMap();
+    public Map<String, Long> wordsFreq = new HashMap();
     public static Set<String> punctuations = new HashSet<>();
+    private double totalFrequency = 0;
     static {
         punctuations.addAll(Arrays.asList(",", ".", ";", "?", "!"));
     }
@@ -52,7 +53,9 @@ public class WordBreakTokenizer implements Tokenizer {
                 if (WordsFreq.get(0).startsWith("\uFEFF")){
                     WordsFreq.set(0, WordsFreq.get(0).substring(1));
                 }
-                hm.put(WordsFreq.get(0), Long.parseLong(WordsFreq.get(1)));
+                Long fre =  Long.parseLong(WordsFreq.get(1));
+                wordsFreq.put(WordsFreq.get(0),fre);
+                totalFrequency += fre;
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -61,79 +64,58 @@ public class WordBreakTokenizer implements Tokenizer {
     }
 
     public List<String> tokenize(String text) {
-        if (text.length()==0)
+        int len = text.length();
+        if (len == 0) {
             return new ArrayList<>();
-        for (String str: punctuations){
+        }
+
+        for (String str: punctuations) {
             if (text.contains(str))
                 throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
         }
-        int length = text.length();
-        String LowerText = text.toLowerCase();
-        Boolean[][] D = new Boolean[length][length];
-        List<List<String>> result = new ArrayList<>();
-        List<String> path = new ArrayList<>();
-        for (int l = 1; l <= length; l++){
-            for (int i = 0; i <= length-l; i++){
-                int j = i+l-1;
-                D[i][j] = false;
-                String subs = LowerText.substring(i, j+1);
-                if (hm.containsKey(subs))
-                    D[i][j] = true;
-                else {
-                    for (int k = i; k <= j-1; k++){
-                        if (D[i][k] && D[k+1][j])
-                            D[i][j] = true;
+
+        text = text.toLowerCase();
+        String[][] cache = new String[len][len];
+        double[][] probabilityMatrix = new double[len][len];
+
+        for (int i = 0; i < len; i++) {
+            for (int j = 0; j < len; j++) {
+                cache[i][j] = "";
+                probabilityMatrix[i][j] = -1;
+            }
+        }
+
+        for (int l = 1; l <= len; l++){
+            for (int i = 0; i <= len-l; i++) {
+                int j = i+l-1; // try to break s[i, j] and s[j] is included
+
+                String subStr = text.substring(i, j+1);
+                if (wordsFreq.containsKey(subStr) && probabilityMatrix[i][j] < (wordsFreq.get(subStr)/totalFrequency)) {
+                    probabilityMatrix[i][j] = wordsFreq.get(subStr)/totalFrequency;
+                    cache[i][j] = subStr;
+                }
+                // Even the substring is in the dictionary, we still need to try to break it
+                // -> test case for the situation that str is in dictionary but it has a higher probability to split it?
+
+                for (int k = i; k <= j-1; k++) {
+                    if (cache[i][k].length() > 0 && cache[k+1][j].length() > 0
+                            && probabilityMatrix[i][j] < probabilityMatrix[i][k] * probabilityMatrix[k+1][j]) {
+                        probabilityMatrix[i][j] = probabilityMatrix[i][k] * probabilityMatrix[k+1][j];
+                        cache[i][j] = cache[i][k] + " " + cache[k+1][j];
                     }
                 }
             }
         }
-        if ( !D[0][length-1] )
-            throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
-        wordBreakResult(LowerText, hm, 0, D, path, result);
-        System.out.println(result);
-        return new ArrayList<>(FinalResult(result, hm));
-    }
 
-    public void wordBreakResult(String text, HashMap hm, int start, Boolean[][]D, List<String> path, List<List<String>> result){
-        int length = text.length();
-        if (start == length){
-            List<String> path1 = new ArrayList<>(path);
-            path1.removeAll(StopWords.stopWords);
-            result.add(path1);
-            return;
+        if (cache[0][len-1].length() == 0 && probabilityMatrix[0][len-1] < 0) {
+            throw new UnsupportedOperationException("String cannot be broken into words according to the dictionary");
         }
-        if (!D[start][length-1]){
-            return;
-        }
-        for (int j = start; j < text.length(); j++){
-            String token = text.substring(start, j+1);
-            if (!hm.containsKey(token)){
-                continue;
-            }
-            path.add(token);
-            wordBreakResult(text, hm, j+1, D, path, result);
-            path.remove(path.size()-1);
-        }
-    }
 
-    public List<String> FinalResult(List<List<String>> result, HashMap hm){
-        List<Double> Prob = new ArrayList<>();
-        for (List<String> li: result){
-            Long freq = 0L;
-            Double prob = 1.0;
-            for (String token: li){
-                Long tok = (Long) hm.get(token);
-                freq = freq + tok;
-            }
-            for (String token: li){
-                Long tok = (Long) hm.get(token);
-                prob = prob * (tok*1.0 / freq);
-            }
-            Prob.add(prob);
-        }
-        Double max = Collections.max(Prob);
-        System.out.println(result.get(Prob.indexOf(max)));
-        return result.get(Prob.indexOf(max));
+        // Use ArrayList to enable modification
+        // Reference: https://stackoverflow.com/questions/6026813/converting-string-array-to-java-util-list
+        List<String> results = new ArrayList<>(Arrays.asList(cache[0][len-1].split(" ")));
+        results.removeAll(StopWords.stopWords);
+        System.out.println(results);
+        return results;
     }
-
 }
