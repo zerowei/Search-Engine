@@ -63,6 +63,7 @@ public class WordBreakTokenizer implements Tokenizer {
         System.out.println();
     }
 
+
     public List<String> tokenize(String text) {
         int len = text.length();
         if (len == 0) {
@@ -71,7 +72,7 @@ public class WordBreakTokenizer implements Tokenizer {
 
         for (String str: punctuations) {
             if (text.contains(str))
-                throw new UnsupportedOperationException("Porter Stemmer Unimplemented");
+                throw new UnsupportedOperationException("Punctuations should not be input to wordBreakTokenizer");
         }
 
         text = text.toLowerCase();
