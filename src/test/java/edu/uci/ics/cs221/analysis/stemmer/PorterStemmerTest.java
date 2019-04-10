@@ -24,6 +24,7 @@ public class PorterStemmerTest {
 
         PorterStemmer porterStemmer = new PorterStemmer();
         assertEquals(expected, testStem(porterStemmer, original));
+        System.out.println(porterStemmer.result);
     }
 
 }
