@@ -1,6 +1,6 @@
 package edu.uci.ics.cs221.analysis;
-import org.apache.lucene.util.ArrayUtil;
 
+import org.apache.lucene.util.ArrayUtil;
 import java.util.ArrayList;
 import java.util.List;
 
