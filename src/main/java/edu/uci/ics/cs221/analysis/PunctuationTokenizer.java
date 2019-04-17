@@ -40,8 +40,9 @@ public class PunctuationTokenizer implements Tokenizer {
             }
         }
         else {
-            throw new UnsupportedOperationException("Punctuation Tokenizer Unimplemented");
+            return tokens;
         }
+        tokens.remove("");
         tokens.removeAll(StopWords.stopWords);
         System.out.println("Final tokens: " + tokens);
         return tokens;
