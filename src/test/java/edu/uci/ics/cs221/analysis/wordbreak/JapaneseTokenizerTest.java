@@ -17,16 +17,16 @@ public class JapaneseTokenizerTest {
 
     @Test
     public void test2() {
-        String text = "桜が咲いていますよ";
-        List<String> expected = Arrays.asList("桜", "が", "咲いて", "います", "よ");
+        String text = "日本語のほうが簡単だと思います";
+        List<String> expected = Arrays.asList("日本語", "の", "ほう", "が", "簡単", "だ", "と", "思い", "ます");
         JapaneseTokenizer tokenizer = new JapaneseTokenizer();
         assertEquals(expected, tokenizer.tokenize(text));
     }
 
     @Test
     public void test3() {
-            String text = "花火スカイ電車インターネット";
-            List<String> expected = Arrays.asList("花火", "スカイ", "電車", "インターネット");
+            String text = "花火炎熱インターネットスカイ";
+            List<String> expected = Arrays.asList("花火", "炎熱", "インターネット", "スカイ");
             JapaneseTokenizer tokenizer = new JapaneseTokenizer();
             assertEquals(expected, tokenizer.tokenize(text));
     }
