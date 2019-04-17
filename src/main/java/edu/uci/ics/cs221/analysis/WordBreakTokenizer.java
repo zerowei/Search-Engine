@@ -60,7 +60,7 @@ public class WordBreakTokenizer implements Tokenizer {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        System.out.println();
+        //System.out.println();
     }
 
 
@@ -109,7 +109,7 @@ public class WordBreakTokenizer implements Tokenizer {
         }
 
         if (cache[0][len-1].length() == 0 && probabilityMatrix[0][len-1] < 0) {
-            throw new UnsupportedOperationException("String cannot be broken into words according to the dictionary");
+            throw new RuntimeException("String cannot be broken into words according to the dictionary");
         }
 
         // Use ArrayList to enable modification
@@ -118,68 +118,5 @@ public class WordBreakTokenizer implements Tokenizer {
         results.removeAll(StopWords.stopWords);
         System.out.println(results);
         return results;
-    }
-
-    private String[][] cache;
-    private double[][] probabilityMatrix;
-    private int len;
-
-    public List<String> tokenizeAsSearch(String text) {
-        len = text.length();
-        if (len == 0) {
-            return new ArrayList<>();
-        }
-        text = text.toLowerCase();
-        cache = new String[len][len];
-        probabilityMatrix = new double[len][len];
-
-        for (int i = 0; i < len; i++) {
-            for (int j = 0; j < len; j++) {
-                cache[i][j] = "";
-                probabilityMatrix[i][j] = -1;
-            }
-        }
-
-        search(text, 0, len-1);
-
-        if (cache[0][len-1].length() == 0 && probabilityMatrix[0][len-1] < 0) {
-            throw new UnsupportedOperationException("String cannot be broken into words according to the dictionary");
-        }
-
-        List<String> results = new ArrayList<>(Arrays.asList(cache[0][len-1].split(" ")));
-        results.removeAll(StopWords.stopWords);
-        System.out.println(results);
-        return results;
-    }
-
-    private double search(String text, int i, int j) { // s[j] is included
-        // probabilityMatrix[i][j] == -1: not searched
-        // probabilityMatrix[i][j] == -0.4: searched but not breakable
-        // probabilityMatrix[i][j] > 0 : breakable
-        if (probabilityMatrix[i][j] > -0.5) {
-            return probabilityMatrix[i][j];
-        }
-
-        String subStr = text.substring(i, j+1);
-        if (wordsFreq.containsKey(subStr) && probabilityMatrix[i][j] < (wordsFreq.get(subStr)/totalFrequency)) {
-            probabilityMatrix[i][j] = wordsFreq.get(subStr)/totalFrequency;
-            cache[i][j] = subStr;
-        }
-        // Even the substring is in the dictionary, we still need to try to break it
-        // -> test case for the situation that str is in dictionary but it has a higher probability to split it?
-
-        for (int k = i; k <= j-1; k++) {
-            if (search(text, i, k) > 0 && search(text, k+1, j) > 0
-                    && probabilityMatrix[i][j] < probabilityMatrix[i][k] * probabilityMatrix[k+1][j]) {
-                probabilityMatrix[i][j] = probabilityMatrix[i][k] * probabilityMatrix[k+1][j];
-                cache[i][j] = cache[i][k] + " " + cache[k+1][j];
-            }
-        }
-
-        if (probabilityMatrix[i][j] < -0.5) {
-            probabilityMatrix[i][j] = -0.4;
-        }
-
-        return probabilityMatrix[i][j];
     }
 }
