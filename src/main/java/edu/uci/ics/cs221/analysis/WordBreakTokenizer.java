@@ -4,6 +4,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.math.*;
 
 /**
  * Project 1, task 2: Implement a Dynamic-Programming based Word-Break Tokenizer.
@@ -82,7 +83,7 @@ public class WordBreakTokenizer implements Tokenizer {
         for (int i = 0; i < len; i++) {
             for (int j = 0; j < len; j++) {
                 cache[i][j] = "";
-                probabilityMatrix[i][j] = -1;
+                probabilityMatrix[i][j] = -10000;
             }
         }
 
@@ -91,8 +92,8 @@ public class WordBreakTokenizer implements Tokenizer {
                 int j = i+l-1; // try to break s[i, j] and s[j] is included
 
                 String subStr = text.substring(i, j+1);
-                if (wordsFreq.containsKey(subStr) && probabilityMatrix[i][j] < (wordsFreq.get(subStr)/totalFrequency)) {
-                    probabilityMatrix[i][j] = wordsFreq.get(subStr)/totalFrequency;
+                if (wordsFreq.containsKey(subStr) && probabilityMatrix[i][j] < Math.log(wordsFreq.get(subStr)/totalFrequency)) {
+                    probabilityMatrix[i][j] = Math.log(wordsFreq.get(subStr)/totalFrequency);
                     cache[i][j] = subStr;
                 }
                 // Even the substring is in the dictionary, we still need to try to break it
@@ -100,8 +101,8 @@ public class WordBreakTokenizer implements Tokenizer {
 
                 for (int k = i; k <= j-1; k++) {
                     if (cache[i][k].length() > 0 && cache[k+1][j].length() > 0
-                            && probabilityMatrix[i][j] < probabilityMatrix[i][k] * probabilityMatrix[k+1][j]) {
-                        probabilityMatrix[i][j] = probabilityMatrix[i][k] * probabilityMatrix[k+1][j];
+                            && probabilityMatrix[i][j] < probabilityMatrix[i][k] + probabilityMatrix[k+1][j]) {
+                        probabilityMatrix[i][j] = probabilityMatrix[i][k] + probabilityMatrix[k+1][j];
                         cache[i][j] = cache[i][k] + " " + cache[k+1][j];
                     }
                 }
@@ -111,7 +112,6 @@ public class WordBreakTokenizer implements Tokenizer {
         if (cache[0][len-1].length() == 0 && probabilityMatrix[0][len-1] < 0) {
             throw new RuntimeException("String cannot be broken into words according to the dictionary");
         }
-
         // Use ArrayList to enable modification
         // Reference: https://stackoverflow.com/questions/6026813/converting-string-array-to-java-util-list
         List<String> results = new ArrayList<>(Arrays.asList(cache[0][len-1].split(" ")));
