@@ -4,7 +4,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
-import java.math.*;
 
 /**
  * Project 1, task 2: Implement a Dynamic-Programming based Word-Break Tokenizer.
@@ -73,7 +72,7 @@ public class WordBreakTokenizer implements Tokenizer {
 
         for (String str: punctuations) {
             if (text.contains(str))
-                throw new UnsupportedOperationException("Punctuations should not be input to wordBreakTokenizer");
+                throw new RuntimeException("Punctuations should not be input to wordBreakTokenizer");
         }
 
         text = text.toLowerCase();
