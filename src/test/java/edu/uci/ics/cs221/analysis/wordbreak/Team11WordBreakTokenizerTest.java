@@ -31,7 +31,7 @@ public class Team11WordBreakTokenizerTest {
     }
 
     // Input string cannot be tokenized, an UnsupportedOperationException is expected
-    @Test(expected = UnsupportedOperationException.class)
+    @Test(expected = RuntimeException.class)
     public void test3() {
         String text = "b";
         List<String> expected = Arrays.asList();
