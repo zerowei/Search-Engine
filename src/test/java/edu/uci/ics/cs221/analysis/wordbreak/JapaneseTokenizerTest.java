@@ -10,7 +10,7 @@ public class JapaneseTokenizerTest {
     @Test
     public void test1() {
         String text = "君が好きだ";
-        List<String> expected = Arrays.asList("君", "が", "好き", "だ");
+        List<String> expected = Arrays.asList("君", "好き");
         JapaneseTokenizer tokenizer = new JapaneseTokenizer();
         assertEquals(expected, tokenizer.tokenize(text));
     }
@@ -18,7 +18,7 @@ public class JapaneseTokenizerTest {
     @Test
     public void test2() {
         String text = "日本語のほうが簡単だと思います";
-        List<String> expected = Arrays.asList("日本語", "の", "ほう", "が", "簡単", "だ", "と", "思い", "ます");
+        List<String> expected = Arrays.asList("日本語", "の", "ほう", "簡単", "思い");
         JapaneseTokenizer tokenizer = new JapaneseTokenizer();
         assertEquals(expected, tokenizer.tokenize(text));
     }
@@ -35,7 +35,7 @@ public class JapaneseTokenizerTest {
     @Test
     public void test4() {
         String text = "明日は花火大会がありますよ一緒に行きませんか";
-        List<String> expected = Arrays.asList("明日", "は", "花火大会", "が", "あります", "よ", "一緒", "に", "行きません", "か");
+        List<String> expected = Arrays.asList("明日", "花火大会", "あります", "一緒", "行きません");
         JapaneseTokenizer tokenizer = new JapaneseTokenizer();
         assertEquals(expected, tokenizer.tokenize(text));
     }
