@@ -1,6 +1,5 @@
 package edu.uci.ics.cs221.analysis;
 
-import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -78,12 +77,12 @@ public class WordBreakTokenizer implements Tokenizer {
 
         text = text.toLowerCase();
         String[][] cache = new String[len][len];
-        BigDecimal[][] probabilityMatrix = new BigDecimal[len][len];
+        double[][] probabilityMatrix = new double[len][len];
 
         for (int i = 0; i < len; i++) {
             for (int j = 0; j < len; j++) {
                 cache[i][j] = "";
-                probabilityMatrix[i][j] = new BigDecimal(-1.0);
+                probabilityMatrix[i][j] = -1;
             }
         }
 
@@ -92,9 +91,8 @@ public class WordBreakTokenizer implements Tokenizer {
                 int j = i+l-1; // try to break s[i, j] and s[j] is included
 
                 String subStr = text.substring(i, j+1);
-                if (wordsFreq.containsKey(subStr) && probabilityMatrix[i][j].doubleValue() < (wordsFreq.get(subStr)/totalFrequency)) {
-                    probabilityMatrix[i][j] = new BigDecimal(wordsFreq.get(subStr)/totalFrequency);
-                    //System.out.println(probabilityMatrix[i][j]);
+                if (wordsFreq.containsKey(subStr) && probabilityMatrix[i][j] < (wordsFreq.get(subStr)/totalFrequency)) {
+                    probabilityMatrix[i][j] = wordsFreq.get(subStr)/totalFrequency;
                     cache[i][j] = subStr;
                 }
                 // Even the substring is in the dictionary, we still need to try to break it
@@ -102,15 +100,15 @@ public class WordBreakTokenizer implements Tokenizer {
 
                 for (int k = i; k <= j-1; k++) {
                     if (cache[i][k].length() > 0 && cache[k+1][j].length() > 0
-                            && probabilityMatrix[i][j].compareTo(probabilityMatrix[i][k].multiply(probabilityMatrix[k+1][j])) < 0) {
-                        probabilityMatrix[i][j] = probabilityMatrix[i][k].multiply(probabilityMatrix[k+1][j]);
+                            && probabilityMatrix[i][j] < probabilityMatrix[i][k] * probabilityMatrix[k+1][j]) {
+                        probabilityMatrix[i][j] = probabilityMatrix[i][k] * probabilityMatrix[k+1][j];
                         cache[i][j] = cache[i][k] + " " + cache[k+1][j];
                     }
                 }
             }
         }
 
-        if (cache[0][len-1].length() == 0 && probabilityMatrix[0][len-1].compareTo(new BigDecimal(0)) < 0) {
+        if (cache[0][len-1].length() == 0 && probabilityMatrix[0][len-1] < 0) {
             throw new RuntimeException("String cannot be broken into words according to the dictionary");
         }
 
@@ -120,10 +118,5 @@ public class WordBreakTokenizer implements Tokenizer {
         results.removeAll(StopWords.stopWords);
         System.out.println(results);
         return results;
-    }
-
-    public double getProbability(String text) {
-        List<String> results = new ArrayList<>(Arrays.asList(text.split(" ")));
-        return 0;
     }
 }
