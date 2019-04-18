@@ -48,7 +48,7 @@ public class JapaneseTokenizer {
         for (int i = 0; i < len; i++) {
             for (int j = 0; j < len; j++) {
                 cache[i][j] = "";
-                probabilityMatrix[i][j] = -1;
+                probabilityMatrix[i][j] = -1000;
             }
         }
 
@@ -56,8 +56,8 @@ public class JapaneseTokenizer {
             for (int i = 0; i <= len - l; i++) {
                 int j = i + l - 1; // try to break s[i, j] and s[j] is included
                 String subStr = text.substring(i, j + 1);
-                if (Words.containsKey(subStr) && probabilityMatrix[i][j] < (Words.get(subStr) *1.0 / totalFre)) {
-                    probabilityMatrix[i][j] = Words.get(subStr) *1.0 / totalFre;
+                if (Words.containsKey(subStr) && probabilityMatrix[i][j] < Math.log(Words.get(subStr) *1.0 / totalFre)) {
+                    probabilityMatrix[i][j] = Math.log(Words.get(subStr) *1.0 / totalFre);
                     cache[i][j] = subStr;
                 }
                 // Even the substring is in the dictionary, we still need to try to break it
@@ -65,8 +65,8 @@ public class JapaneseTokenizer {
 
                 for (int k = i; k <= j - 1; k++) {
                     if (cache[i][k].length() > 0 && cache[k + 1][j].length() > 0
-                            && probabilityMatrix[i][j] < probabilityMatrix[i][k] * probabilityMatrix[k + 1][j]) {
-                        probabilityMatrix[i][j] = probabilityMatrix[i][k] * probabilityMatrix[k + 1][j];
+                            && probabilityMatrix[i][j] < probabilityMatrix[i][k] + probabilityMatrix[k + 1][j]) {
+                        probabilityMatrix[i][j] = probabilityMatrix[i][k] + probabilityMatrix[k + 1][j];
                         cache[i][j] = cache[i][k] + " " + cache[k + 1][j];
                     }
                 }
@@ -78,6 +78,7 @@ public class JapaneseTokenizer {
         }
 
         List<String> results = new ArrayList<>(Arrays.asList(cache[0][len - 1].split(" ")));
+        results.removeAll(JapaneseStopWords.JapanesestopWords);
         System.out.println(results);
         return results;
     }
