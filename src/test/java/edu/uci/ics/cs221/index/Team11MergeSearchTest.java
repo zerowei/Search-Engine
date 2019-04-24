@@ -16,13 +16,12 @@ public class Team11MergeSearchTest {
 
     // Back to December by Taylor Swift
     Document[] documents = new Document[] {
-        new Document("This morning I ate eggs"),
-        new Document("I'm so glad you made time to see me"),
-        new Document("How's life, tell me how's your family?"),
-        new Document("I haven't seen them in a while"),
-        new Document("You've been good, busier then ever"),
-        new Document("We small talk, work and the weather"),
-        new Document("Your guard is up and I know why")
+        new Document("import edu uci ics cs221 analysis  Analyzer"),
+        new Document("import edu uci ics cs221 analysis  ComposableAnalyzer"),
+        new Document("import edu uci ics cs221 analysis  PorterStemmer"),
+        new Document("import edu uci ics cs221 analysis  PunctuationTokenizer"),
+        new Document("import edu uci ics cs221 index     inverted            InvertedIndexManager"),
+        new Document("import edu uci ics cs221 storage   Document")
     };
 
     Analyzer analyzer = new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
@@ -53,7 +52,7 @@ public class Team11MergeSearchTest {
             assert index.getNumSegments() < InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD;
         }
     }
-    
+
     @Test
     public void mergeSearchTest2() {
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1;
