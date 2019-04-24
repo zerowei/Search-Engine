@@ -44,6 +44,7 @@ public class Team11MergeSearchTest {
 
     @Test
     public void mergeSearchTest1() {
+        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1;
         InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 4;
 
         for (Document doc : documents) {
