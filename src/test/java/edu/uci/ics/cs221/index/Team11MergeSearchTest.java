@@ -45,7 +45,7 @@ public class Team11MergeSearchTest {
 
     @Test
     public void mergeSearchTest1() {
-        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 5;
+        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 5;
 
         for (Document doc : documents) {
             index.addDocument(doc);
