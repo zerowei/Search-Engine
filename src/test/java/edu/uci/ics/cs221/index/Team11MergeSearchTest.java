@@ -44,12 +44,11 @@ public class Team11MergeSearchTest {
 
     @Test
     public void mergeSearchTest1() {
-        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 5;
+        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 4;
 
         for (Document doc : documents) {
             index.addDocument(doc);
-            index.mergeAllSegments();
-            assert index.getNumSegments() < InvertedIndexManager.DEFAULT_MERGE_THRESHOLD;
+            assert index.getNumSegments() <= InvertedIndexManager.DEFAULT_MERGE_THRESHOLD;
         }
     }
 
