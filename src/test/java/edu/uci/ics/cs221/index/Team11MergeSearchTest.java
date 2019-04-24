@@ -53,4 +53,20 @@ public class Team11MergeSearchTest {
             assert index.getNumSegments() < InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD;
         }
     }
+    
+    @Test
+    public void mergeSearchTest2() {
+        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1;
+        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 2;
+
+        manager.addDocument(documents[0]);
+        manager.addDocument(documents[1]);
+        int expectedNumSegments = 1;
+        assertEquals(expectedNumSegments, manager.getNumSegments());
+    }
+    @After
+    public void delete1() {
+        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1000;
+        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 8;
+    }
 }
