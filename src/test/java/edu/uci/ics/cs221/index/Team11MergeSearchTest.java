@@ -6,8 +6,8 @@ import edu.uci.ics.cs221.analysis.PorterStemmer;
 import edu.uci.ics.cs221.analysis.PunctuationTokenizer;
 import edu.uci.ics.cs221.index.inverted.InvertedIndexManager;
 import edu.uci.ics.cs221.storage.Document;
-import org.junit.Before;
 import org.junit.Test;
+
 
 public class Team11MergeSearchTest {
 
@@ -20,7 +20,7 @@ public class Team11MergeSearchTest {
             new Document("You've been good, busier then ever"),
             new Document("We small talk, work and the weather"),
             new Document("Your guard is up and I know why")
-    }
+    };
 
     Analyzer analyzer = new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
     InvertedIndexManager index = InvertedIndexManager.createOrOpen("index_path", analyzer);
@@ -28,8 +28,11 @@ public class Team11MergeSearchTest {
     @Test
     public void mergeSearchTest1() {
         index.DEFAULT_FLUSH_THRESHOLD = 5;
-        
+
+        for (Document doc : documents) {
+            index.addDocument(doc);
+            assert index.getNumSegments() < index.DEFAULT_FLUSH_THRESHOLD;
+        }
+
     }
-
-
 }
