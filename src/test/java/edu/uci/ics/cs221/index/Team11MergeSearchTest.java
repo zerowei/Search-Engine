@@ -6,9 +6,7 @@ import edu.uci.ics.cs221.analysis.PorterStemmer;
 import edu.uci.ics.cs221.analysis.PunctuationTokenizer;
 import edu.uci.ics.cs221.index.inverted.InvertedIndexManager;
 import edu.uci.ics.cs221.storage.Document;
-import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
@@ -26,16 +24,10 @@ public class Team11MergeSearchTest {
         new Document("import edu uci ics cs221 storage   Document")
     };
 
-    Analyzer analyzer;
-    InvertedIndexManager index;
+    Analyzer analyzer = new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
+    InvertedIndexManager index = InvertedIndexManager.createOrOpen(indexPath, analyzer);
 
-    @Before
-    public void before() {
-        analyzer = new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
-        index = InvertedIndexManager.createOrOpen(indexPath, analyzer);
-    }
-
-    @After
+    @AfterClass
     public void clean() {
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1000;
         InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 8;
@@ -69,10 +61,21 @@ public class Team11MergeSearchTest {
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1;
         InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 2;
 
-        manager.addDocument(documents[0]);
-        manager.addDocument(documents[1]);
+        index.addDocument(documents[0]);
+        index.addDocument(documents[1]);
         int expectedNumSegments = 1;
-        assertEquals(expectedNumSegments, manager.getNumSegments());
+        assertEquals(expectedNumSegments, index.getNumSegments());
     }
+    
+    @Test
+    public void mergeSearchTest3() {
+        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 2;
 
+        for (int i = 0; i < 6 ; i++){
+            index.addDocument(documents[i]);
+        }
+        index.mergeAllSegments();
+        int expectedNumSegments = 3;
+        assertEquals(expectedNumSegments, index.getNumSegments());
+    }
 }
