@@ -72,6 +72,11 @@ public class MapdbDocStore implements DocumentStore {
     }
 
     @Override
+    public Iterator<Integer> keyIterator() {
+        return this.map.keyIterator();
+    }
+
+    @Override
     public long size() {
         return this.map.sizeLong();
     }

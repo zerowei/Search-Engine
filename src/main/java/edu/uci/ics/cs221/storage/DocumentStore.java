@@ -35,6 +35,14 @@ public interface DocumentStore extends AutoCloseable {
     Iterator<Map.Entry<Integer, Document>> iterator();
 
     /**
+     * Iterates through the document IDs of the document store.
+     * Underlying implementation could perform a index-only scan without reading the documents,
+     * making it more efficient than reading all the documents.
+     * @return
+     */
+    Iterator<Integer> keyIterator();
+
+    /**
      * Gets the size of the Document Store.
      * (Size could be used externally to assign document ID.)
      * @return number of documents in the Document Store.
