@@ -6,7 +6,7 @@ import edu.uci.ics.cs221.analysis.PorterStemmer;
 import edu.uci.ics.cs221.analysis.PunctuationTokenizer;
 import edu.uci.ics.cs221.index.inverted.InvertedIndexManager;
 import edu.uci.ics.cs221.storage.Document;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Test;
 
 import java.io.File;
@@ -27,7 +27,7 @@ public class Team11MergeSearchTest {
     Analyzer analyzer = new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
     InvertedIndexManager index = InvertedIndexManager.createOrOpen(indexPath, analyzer);
 
-    @After
+    @AfterClass
     public void clean() {
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1000;
         InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 8;
