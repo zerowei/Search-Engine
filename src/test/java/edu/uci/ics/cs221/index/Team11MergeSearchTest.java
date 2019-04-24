@@ -29,6 +29,9 @@ public class Team11MergeSearchTest {
 
     @After
     public void clean() {
+        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1000;
+        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 8;
+
         try {
             File file = new File(indexPath);
 
@@ -63,9 +66,5 @@ public class Team11MergeSearchTest {
         int expectedNumSegments = 1;
         assertEquals(expectedNumSegments, manager.getNumSegments());
     }
-    @After
-    public void delete1() {
-        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1000;
-        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 8;
-    }
+
 }
