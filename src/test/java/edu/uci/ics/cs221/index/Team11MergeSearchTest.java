@@ -6,7 +6,8 @@ import edu.uci.ics.cs221.analysis.PorterStemmer;
 import edu.uci.ics.cs221.analysis.PunctuationTokenizer;
 import edu.uci.ics.cs221.index.inverted.InvertedIndexManager;
 import edu.uci.ics.cs221.storage.Document;
-import org.junit.AfterClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
@@ -16,18 +17,24 @@ public class Team11MergeSearchTest {
 
     // Back to December by Taylor Swift
     Document[] documents = new Document[] {
-        new Document("import edu uci ics cs221 analysis  Analyzer"),
-        new Document("import edu uci ics cs221 analysis  ComposableAnalyzer"),
-        new Document("import edu uci ics cs221 analysis  PorterStemmer"),
-        new Document("import edu uci ics cs221 analysis  PunctuationTokenizer"),
-        new Document("import edu uci ics cs221 index     inverted            InvertedIndexManager"),
-        new Document("import edu uci ics cs221 storage   Document")
+            new Document("import edu uci ics cs221 analysis  Analyzer"),
+            new Document("import edu uci ics cs221 analysis  ComposableAnalyzer"),
+            new Document("import edu uci ics cs221 analysis  PorterStemmer"),
+            new Document("import edu uci ics cs221 analysis  PunctuationTokenizer"),
+            new Document("import edu uci ics cs221 index     inverted            InvertedIndexManager"),
+            new Document("import edu uci ics cs221 storage   Document")
     };
 
-    Analyzer analyzer = new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
-    InvertedIndexManager index = InvertedIndexManager.createOrOpen(indexPath, analyzer);
+    Analyzer analyzer;
+    InvertedIndexManager index;
 
-    @AfterClass
+    @Before
+    public void before() {
+        analyzer = new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
+        index = InvertedIndexManager.createOrOpen(indexPath, analyzer);
+    }
+
+    @After
     public void clean() {
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1000;
         InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 8;
@@ -66,7 +73,7 @@ public class Team11MergeSearchTest {
         int expectedNumSegments = 1;
         assertEquals(expectedNumSegments, index.getNumSegments());
     }
-    
+
     @Test
     public void mergeSearchTest3() {
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 2;
