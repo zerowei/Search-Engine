@@ -100,7 +100,7 @@ public class PageFileChannel implements AutoCloseable {
         int numPages = this.getNumPages();
         ByteBuffer buffer = ByteBuffer.allocate(numPages * PAGE_SIZE);
         for (int i = 0; i < numPages; i++) {
-            buffer.put(readPage(i).array(), i * PAGE_SIZE, PAGE_SIZE);
+            buffer.put(readPage(i).array());
         }
         return buffer;
     }
