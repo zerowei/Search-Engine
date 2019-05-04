@@ -106,6 +106,7 @@ public class InvertedIndexManager {
         //throw new UnsupportedOperationException();
     }
 
+    // Test cases fail if return Paths.get() directly here
     private String getHeaderFilePathString() {
         return indexFolder + "/header" + numOfSeg.toString() + ".txt";
     }
@@ -257,9 +258,9 @@ public class InvertedIndexManager {
         List<Document> results = new ArrayList<>();
         keyword = analyzer.analyze(keyword).get(0);
         for (int i = 0; i < getNumSegments(); i++) {
-            String path = indexFolder + "/header" + i + ".txt";
-            Path filePath = Paths.get(path);
-            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
+            String headerFilePathString = indexFolder + "/header" + i + ".txt";
+            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(Paths.get(headerFilePathString));
+
             ByteBuffer btf = pageFileChannel.readAllPages();
             btf.flip();
             int pageID=0, offset=0, length=0;
@@ -282,9 +283,8 @@ public class InvertedIndexManager {
                 return Collections.emptyIterator();
             }
 
-            String path1 = getSegmentFilePathString();
-            Path filePath1 = Paths.get(path1);
-            PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
+            String segmentFilePathString = getSegmentFilePathString();
+            PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
             byte[] docs = new byte[length * 4];
             int pages;
             if (length <= PAGE_SIZE - offset*4) {
