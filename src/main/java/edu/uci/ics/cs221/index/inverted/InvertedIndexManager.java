@@ -244,18 +244,13 @@ public class InvertedIndexManager {
 
         Preconditions.checkNotNull(keyword);
         if (keyword.equals("")) {
-            return null;
+            return Collections.emptyIterator();
         }
         List<Document> results = new ArrayList<>();
         keyword = analyzer.analyze(keyword).get(0);
         for (int i = 0; i < getNumSegments(); i++) {
-            String path = indexFolder + "/header" + i + ".txt";
-            Path filePath = Paths.get(path);
-            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
-            ByteBuffer btf = pageFileChannel.readAllPages();
-            String docStorePath = indexFolder + "/docs" + i + ".db";
-            DocumentStore documentStore = MapdbDocStore.createOrOpen(docStorePath);
             Map<String, List<Integer>> invertedLists = getIndexSegment(i).getInvertedLists();
+            Map<Integer, Document> docss = getIndexSegment(i).getDocuments();
             List<String> keys = new ArrayList<>(invertedLists.keySet());
             int low = 0, high = keys.size() - 1;
             while (low <= high) {
@@ -264,7 +259,7 @@ public class InvertedIndexManager {
                 if (keyword.equals(key)) {
                     List<Integer> docIDs = invertedLists.get(key);
                     for (Integer j : docIDs) {
-                        results.add(documentStore.getDocument(j));
+                        results.add(docss.get(j));
                     }
                     break;
                 } else if (keyword.compareTo(key) > 0) {
@@ -273,7 +268,6 @@ public class InvertedIndexManager {
                     high = mid - 1;
                 }
             }
-            documentStore.close();
         }
         return results.iterator();
 
