@@ -480,6 +480,9 @@ public class InvertedIndexManager {
             }
             invertedLists.put(keyWord, docIDs);
         }
+        pageFileChannel.close();
+        pageFileChannel1.close();
+
         return new InvertedIndexSegmentForTest(invertedLists, documents);
         //throw new UnsupportedOperationException();
     }
