@@ -214,6 +214,7 @@ public class InvertedIndexManager {
         int numOccurrence;
     }
 
+    // Since the underlying file is based on pages, we need such an iterator to make life easier
     class HeaderFileRowIterator implements Iterator<HeaderFileRow> {
         PageFileChannel file;
         ByteBuffer buffer;
@@ -239,6 +240,40 @@ public class InvertedIndexManager {
 
     }
 
+    private void flushBufferIfNeeded(ByteBuffer buffer, PageFileChannel file) {
+        if (buffer.position() > PAGE_SIZE * 10) {
+            file.appendAllBytes(buffer);
+            buffer.clear();
+        }
+    }
+
+    class AutoFlushBuffer {
+        ByteBuffer buffer;
+        PageFileChannel file;
+
+        AutoFlushBuffer(ByteBuffer buffer, PageFileChannel file) {
+            this.buffer = buffer;
+            this.file = file;
+        }
+
+        AutoFlushBuffer put(byte[] bytes) {
+            buffer.put(bytes);
+
+            if (buffer.position() > PAGE_SIZE * 10) {
+                file.appendAllBytes(buffer);
+                buffer.clear();
+            }
+
+            return this;
+        }
+
+        AutoFlushBuffer flush() {
+            file.appendAllBytes(buffer);
+            buffer.clear();
+            return this;
+        }
+    }
+
     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
         int offsetHeaderFileA = 0, offsetHeaderFileB = 0;
         int offsetSegmentFileA = 0, offsetSegmentFileB = 0;
@@ -248,12 +283,15 @@ public class InvertedIndexManager {
         PageFileChannel fileHeaderB     = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumB)));
         PageFileChannel fileHeaderNew   = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumNew)));
 
-        PageFileChannel fileSegmenterA      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumA)));
-        PageFileChannel fileSegmenterB      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumB)));
-        PageFileChannel fileSegmenterNew    = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumNew)));
+        PageFileChannel fileSegmentA      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumA)));
+        PageFileChannel fileSegmentB      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumB)));
+        PageFileChannel fileSegmentNew    = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumNew)));
 
         HeaderFileRowIterator headerFileRowIteratorA = new HeaderFileRowIterator(fileHeaderA);
         HeaderFileRowIterator headerFileRowIteratorB = new HeaderFileRowIterator(fileHeaderB);
+
+        AutoFlushBuffer bufferHeaderFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileHeaderNew);
+        AutoFlushBuffer bufferSegmentFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileSegmentNew);
 
         while (headerFileRowIteratorA.hasNext() && headerFileRowIteratorB.hasNext()) {
             HeaderFileRow rowA = headerFileRowIteratorA.next();
@@ -266,6 +304,7 @@ public class InvertedIndexManager {
             } else if (rowA.keyword.compareTo(rowB.keyword) < 0) {
 
             }
+
         }
 
         while (headerFileRowIteratorA.hasNext()) {
@@ -276,7 +315,17 @@ public class InvertedIndexManager {
 
         }
 
+        bufferHeaderFileNew.flush();
+        bufferSegmentFileNew.flush();
+
         mergeDocumentStores(segNumA, segNumB, segNumNew);
+
+        fileHeaderA.close();
+        fileHeaderB.close();
+        fileHeaderNew.close();
+        fileSegmentA.close();
+        fileSegmentB.close();
+        fileSegmentNew.close();
 
         return;
     }
