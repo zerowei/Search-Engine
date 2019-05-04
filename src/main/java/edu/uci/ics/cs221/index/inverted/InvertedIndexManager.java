@@ -103,14 +103,7 @@ public class InvertedIndexManager {
         }
         record += 1;
         if (record == DEFAULT_FLUSH_THRESHOLD) {
-            Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
-            DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
-            documentStore.close();
             flush();
-            numStores += 1;
-            record = 0;
-            buffer.clear();
-            documents.clear();
         }
         //throw new UnsupportedOperationException();
     }
@@ -123,6 +116,9 @@ public class InvertedIndexManager {
         if (buffer.isEmpty()) {
             return;
         }
+        Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
+        DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
+        documentStore.close();
         String path = "./index/Team17/header" + numOfSeg.toString() + ".txt";
         String path1 = "./index/Team17/segment" + numOfSeg.toString() + ".txt";
         int len = 0;
@@ -419,7 +415,7 @@ public class InvertedIndexManager {
         if (segmentNum >= numOfSeg)
             return null;
         String docStorePath1 = "./index/Team17/docs" + segmentNum + ".db";
-        DocumentStore documentStore1 = MapdbDocStore.createOrOpen(docStorePath1);
+        DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
         Iterator<Integer> itr = documentStore1.keyIterator();
         Map<Integer, Document> documents = new HashMap<>();
         while (itr.hasNext()) {
