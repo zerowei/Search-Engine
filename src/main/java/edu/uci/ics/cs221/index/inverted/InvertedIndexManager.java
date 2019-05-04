@@ -249,28 +249,70 @@ public class InvertedIndexManager {
         List<Document> results = new ArrayList<>();
         keyword = analyzer.analyze(keyword).get(0);
         for (int i = 0; i < getNumSegments(); i++) {
-            Map<String, List<Integer>> invertedLists = getIndexSegment(i).getInvertedLists();
-            Map<Integer, Document> docss = getIndexSegment(i).getDocuments();
-            List<String> keys = new ArrayList<>(invertedLists.keySet());
-            int low = 0, high = keys.size() - 1;
-            while (low <= high) {
-                int mid = (low + high) / 2;
-                String key = keys.get(mid);
-                if (keyword.equals(key)) {
-                    List<Integer> docIDs = invertedLists.get(key);
-                    for (Integer j : docIDs) {
-                        results.add(docss.get(j));
-                    }
+            String path = indexFolder + "/header" + i + ".txt";
+            Path filePath = Paths.get(path);
+            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
+            ByteBuffer btf = pageFileChannel.readAllPages();
+            btf.flip();
+            int pageID=0, offset=0, length=0;
+            String key = "";
+            while (btf.hasRemaining()) {
+                int wordLength = btf.getInt();
+                if (wordLength == 0)
                     break;
-                } else if (keyword.compareTo(key) > 0) {
-                    low = mid + 1;
-                } else {
-                    high = mid - 1;
+                byte[] dst = new byte[wordLength];
+                btf.get(dst, 0, wordLength);
+                pageID = btf.getInt();
+                offset = btf.getInt();
+                length = btf.getInt();
+                key = new String(dst);
+                if (keyword.equals(key)) {
+                    break;
                 }
             }
+            if (!key.equals(keyword)){
+                return Collections.emptyIterator();
+            }
+            String path1 = indexFolder + "/segment" + i + ".txt";
+            Path filePath1 = Paths.get(path1);
+            PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
+            byte[] docs = new byte[length * 4];
+            int pages;
+            if (length <= PAGE_SIZE - offset*4) {
+                pages = 1;
+            } else {
+                int extraPages = (length - (PAGE_SIZE - offset*4)) / PAGE_SIZE;
+                int pos = (length - (PAGE_SIZE - offset*4)) % PAGE_SIZE;
+                if (pos == 0) {
+                    pages = extraPages + 1;
+                } else {
+                    pages = extraPages + 2;
+                }
+            }
+            ByteBuffer buf = ByteBuffer.allocate(pages * PAGE_SIZE);
+            for (int j = 0; j < pages; j++) {
+                buf.put(pageFileChannel1.readPage(pageID + j));
+            }
+            buf.position(offset * 4);
+            buf.get(docs, 0, length * 4);
+            ByteBuffer dor = ByteBuffer.allocate(length * 4);
+            dor.put(docs);
+            dor.flip();
+            List<Integer> docIDs = new ArrayList<>();
+            while (dor.hasRemaining()) {
+                int docID = dor.getInt();
+                docIDs.add(docID);
+            }
+            String docStorePath1 = indexFolder + "/docs" + i + ".db";
+            DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
+            for (Integer e : docIDs){
+                results.add(documentStore1.getDocument(e));
+            }
+            documentStore1.close();
+            pageFileChannel.close();
+            pageFileChannel1.close();
         }
         return results.iterator();
-
          //throw new UnsupportedOperationException();
     }
 
