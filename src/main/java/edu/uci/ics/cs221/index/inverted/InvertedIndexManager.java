@@ -106,6 +106,14 @@ public class InvertedIndexManager {
         //throw new UnsupportedOperationException();
     }
 
+    private String getHeaderFilePathString() {
+        return indexFolder + "/header" + numOfSeg.toString() + ".txt";
+    }
+
+    private String getSegmentFilePathString() {
+        return indexFolder + "/segment" + numOfSeg.toString() + ".txt";
+    }
+
     /**
      * Flushes all the documents in the in-memory segment buffer to disk. If the buffer is empty, it should not do anything.
      * flush() writes the segment to disk containing the posting list and the corresponding document store.
@@ -117,7 +125,7 @@ public class InvertedIndexManager {
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
-        String path = indexFolder + "/header" + numOfSeg.toString() + ".txt";
+        String path = getHeaderFilePathString();
         String path1 = indexFolder + "/segment" + numOfSeg.toString() + ".txt";
         int len = 0;
         int pageId, offset;
@@ -273,7 +281,8 @@ public class InvertedIndexManager {
             if (!key.equals(keyword)){
                 return Collections.emptyIterator();
             }
-            String path1 = indexFolder + "/segment" + i + ".txt";
+
+            String path1 = getSegmentFilePathString();
             Path filePath1 = Paths.get(path1);
             PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
             byte[] docs = new byte[length * 4];
