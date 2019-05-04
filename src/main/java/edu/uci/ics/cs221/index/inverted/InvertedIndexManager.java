@@ -393,6 +393,7 @@ public class InvertedIndexManager {
             currentDocumentId++;
             if (currentDocumentId >= currentDocumentStore.size()) {
                 currentDocumentStoreId++;
+                currentDocumentStore.close();
                 String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
                 if (currentDocumentStoreId < numStores) {
                     currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
