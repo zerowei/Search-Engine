@@ -268,6 +268,14 @@ public class InvertedIndexManager {
             }
         }
 
+        while (headerFileRowIteratorA.hasNext()) {
+
+        }
+
+        while (headerFileRowIteratorB.hasNext()) {
+
+        }
+
         mergeDocumentStores(segNumA, segNumB, segNumNew);
 
         return;
