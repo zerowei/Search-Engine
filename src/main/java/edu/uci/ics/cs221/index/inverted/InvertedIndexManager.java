@@ -127,31 +127,36 @@ public class InvertedIndexManager {
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
         String path = getHeaderFilePathString();
-        String path1 = indexFolder + "/segment" + numOfSeg.toString() + ".txt";
+        String path1 = getSegmentFilePathString();
         int len = 0;
-        int pageId, offset;
         numOfSeg += 1;
         Path filePath = Paths.get(path);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
+
         for (String obj : buffer.keySet()) {
             len = len + obj.getBytes().length + 4 * 4;
         }
-        pageId = 0;
-        offset = 0;
+
+        int pageId = 0, offset = 0;
+
         ByteBuffer buf = ByteBuffer.allocate(len);
-        for (String words : buffer.keySet()) {
-            int wordSize = buffer.get(words).size();
-            buf.putInt(words.length());
-            byte[] bytes = words.getBytes();
+
+        for (String word : buffer.keySet()) {
+
+            buf.putInt(word.length());
+            byte[] bytes = word.getBytes();
             buf.put(bytes);
-            buf.putInt(pageId).putInt(offset).putInt(wordSize);
-            if (wordSize < PAGE_SIZE - offset) {
-                offset += wordSize;
+
+            int numOccurrence = buffer.get(word).size();
+            buf.putInt(pageId).putInt(offset).putInt(numOccurrence);
+            if (numOccurrence < PAGE_SIZE - offset) {
+                offset += numOccurrence;
             } else {
-                pageId = pageId + 1 + (wordSize - (PAGE_SIZE - offset)) / PAGE_SIZE;
-                offset = (wordSize - (PAGE_SIZE - offset)) % PAGE_SIZE;
+                pageId = pageId + 1 + (numOccurrence - (PAGE_SIZE - offset)) / PAGE_SIZE;
+                offset = (numOccurrence - (PAGE_SIZE - offset)) % PAGE_SIZE;
             }
         }
+
         pageFileChannel.appendAllBytes(buf);
         buf.clear();
         pageFileChannel.close();
@@ -160,10 +165,9 @@ public class InvertedIndexManager {
         PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         int numOfInts = 0;
         for (List<Integer> appears : buffer.values()) {
-            for (Integer i : appears) {
-                numOfInts++;
-            }
+            numOfInts += appears.size();
         }
+
         ByteBuffer byteBuffer = ByteBuffer.allocate(numOfInts * 4);
         for (List<Integer> appears : buffer.values()) {
             for (Integer i : appears) {
