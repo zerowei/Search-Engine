@@ -494,15 +494,15 @@ public class InvertedIndexManager {
         if (segmentNum >= numOfSeg)
             return null;
         String docStorePath1 = indexFolder + "/docs" + segmentNum + ".db";
-        DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
-        Iterator<Integer> itr = documentStore1.keyIterator();
+        DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
+        Iterator<Integer> itr = documentStore.keyIterator();
         Map<Integer, Document> documents = new HashMap<>();
         while (itr.hasNext()) {
             Integer inte = itr.next();
-            Document doc = documentStore1.getDocument(inte);
+            Document doc = documentStore.getDocument(inte);
             documents.put(inte, doc);
         }
-        documentStore1.close();
+        documentStore.close();
         String path = indexFolder + "/header" + segmentNum + ".txt";
         Path filePath = Paths.get(path);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
