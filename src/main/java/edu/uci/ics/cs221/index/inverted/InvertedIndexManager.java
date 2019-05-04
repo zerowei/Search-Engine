@@ -45,7 +45,7 @@ public class InvertedIndexManager {
     public Map<Integer, Document> documents = new TreeMap<>();
     public Integer record = 0;
     public Integer numStores = 0;
-    private Integer numOfSeg = 0;
+    private Integer numSegments = 0;
     public String docStorePath;
 
     private InvertedIndexManager(String indexFolder, Analyzer analyzer) {
@@ -74,6 +74,10 @@ public class InvertedIndexManager {
         }
     }
 
+    private String getDocumentStorePathString(int storeNum) {
+        return indexFolder + "/docs" + storeNum + ".db";
+    }
+
     /**
      * Adds a document to the inverted index.
      * Document should live in a in-memory buffer until `flush()` is called to write the segment to disk.
@@ -82,7 +86,7 @@ public class InvertedIndexManager {
      */
     public void addDocument(Document document) {
         Preconditions.checkNotNull(document);
-        docStorePath = indexFolder + "/docs" + numStores.toString() + ".db";
+        docStorePath = getDocumentStorePathString(numStores);
         documents.put(record, document);
         List<String> tokens = analyzer.analyze(document.getText());
         for (String token : tokens) {
@@ -108,11 +112,11 @@ public class InvertedIndexManager {
 
     // Test cases fail if return Paths.get() directly here
     private String getHeaderFilePathString() {
-        return indexFolder + "/header" + numOfSeg.toString() + ".txt";
+        return indexFolder + "/header" + numSegments.toString() + ".txt";
     }
 
     private String getSegmentFilePathString() {
-        return indexFolder + "/segment" + numOfSeg.toString() + ".txt";
+        return indexFolder + "/segment" + numSegments.toString() + ".txt";
     }
 
     /**
@@ -129,7 +133,7 @@ public class InvertedIndexManager {
         String path = getHeaderFilePathString();
         String path1 = getSegmentFilePathString();
         int len = 0;
-        numOfSeg += 1;
+        numSegments += 1;
         Path filePath = Paths.get(path);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
 
@@ -177,7 +181,7 @@ public class InvertedIndexManager {
         pageFileChannel1.appendAllBytes(byteBuffer);
         byteBuffer.clear();
         pageFileChannel1.close();
-        if (numOfSeg == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
+        if (numSegments == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
             mergeAllSegments();
         }
         numStores += 1;
@@ -202,47 +206,54 @@ public class InvertedIndexManager {
         //throw new UnsupportedOperationException();
     }
 
+    private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
+        int offsetHeaderFileA = 0, offsetHeaderFileB = 0;
+        int offsetSegmentFileA = 0, offsetSegmentFileB = 0;
+        int numDocumentA = 0;
+
+        Map<String, List<Integer>> invertedLists = getIndexSegment(segNumA).getInvertedLists();
+        Map<String, List<Integer>> invertedLists1 = getIndexSegment(segNumB).getInvertedLists();
+        for (List<Integer> intr : invertedLists1.values()) {
+            for (Integer obj : intr)
+                obj = obj + getIndexSegment(segNumA).getDocuments().size();
+        }
+        Map<String, List<Integer>> difference = new HashMap<>();
+        for (String str1 : invertedLists1.keySet()) {
+            for (String str : invertedLists.keySet()) {
+                if (!str.equals(str1)) {
+                    continue;
+                }
+                invertedLists.get(str).addAll(invertedLists1.get(str1));
+            }
+            difference.put(str1, invertedLists1.get(str1));
+        }
+        invertedLists.putAll(difference);
+        buffer.putAll(invertedLists);
+        flush();
+        buffer.clear();
+        docStorePath = "./docs" + segNumNew + ".db";
+        DocumentStore documentStore = MapdbDocStore.createOrOpen(docStorePath);
+        int size = getIndexSegment(segNumA).getDocuments().size();
+        for (int j = 0; j < size; j++) {
+            documentStore.addDocument(j, getIndexSegment(segNumA).getDocuments().get(j));
+        }
+        for (int k = 0; k < getIndexSegment(segNumB).getDocuments().size(); k++) {
+            documentStore.addDocument(size + k, getIndexSegment(segNumB).getDocuments().get(k));
+        }
+        documentStore.close();
+    }
+
     /**
      * Merges all the disk segments of the inverted index pair-wise.
      */
     public void mergeAllSegments() {
         // merge only happens at even number of segments
         Preconditions.checkArgument(getNumSegments() % 2 == 0);
-        numOfSeg = 0;
-        numStores = 0;
-        for (int i = 0; i <= InvertedIndexManager.DEFAULT_MERGE_THRESHOLD - 2; i = i + 2) {
-            Map<String, List<Integer>> invertedLists = getIndexSegment(i).getInvertedLists();
-            Map<String, List<Integer>> invertedLists1 = getIndexSegment(i + 1).getInvertedLists();
-            for (List<Integer> intr : invertedLists1.values()) {
-                for (Integer obj : intr)
-                    obj = obj + getIndexSegment(i).getDocuments().size();
-            }
-            Map<String, List<Integer>> difference = new HashMap<>();
-            for (String str1 : invertedLists1.keySet()) {
-                for (String str : invertedLists.keySet()) {
-                    if (!str.equals(str1)) {
-                        continue;
-                    }
-                    invertedLists.get(str).addAll(invertedLists1.get(str1));
-                }
-                difference.put(str1, invertedLists1.get(str1));
-            }
-            invertedLists.putAll(difference);
-            buffer.putAll(invertedLists);
-            flush();
-            buffer.clear();
-            docStorePath = "./docs" + i / 2 + ".db";
-            DocumentStore documentStore = MapdbDocStore.createOrOpen(docStorePath);
-            int size = getIndexSegment(i).getDocuments().size();
-            for (int j = 0; j < size; j++) {
-                documentStore.addDocument(j, getIndexSegment(i).getDocuments().get(j));
-            }
-            for (int k = 0; k < getIndexSegment(i + 1).getDocuments().size(); k++) {
-                documentStore.addDocument(size + k, getIndexSegment(i + 1).getDocuments().get(k));
-            }
-            documentStore.close();
+
+        for (int i = 0; i < numSegments; i+=2) {
+            mergeSegments(i, i+1, i/2);
         }
-        // throw new UnsupportedOperationException();
+        numSegments /= 2;
     }
 
     /**
@@ -316,7 +327,7 @@ public class InvertedIndexManager {
                 int docID = dor.getInt();
                 docIDs.add(docID);
             }
-            String docStorePath1 = indexFolder + "/docs" + i + ".db";
+            String docStorePath1 = getDocumentStorePathString(i);
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
             for (Integer e : docIDs){
                 results.add(documentStore1.getDocument(e));
@@ -426,15 +437,12 @@ public class InvertedIndexManager {
         DocumentIterator() {
             currentDocumentStoreId = 0;
             currentDocumentId = 0;
-            String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
+            String docStorePath = getDocumentStorePathString(currentDocumentStoreId);
             currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
         }
 
         @Override public boolean hasNext() {
-            if (currentDocumentStoreId < numStores) {
-                return true;
-            }
-            return false;
+            return currentDocumentStoreId < numStores;
         }
 
         @Override public Document next() {
@@ -444,7 +452,7 @@ public class InvertedIndexManager {
             if (currentDocumentId >= currentDocumentStore.size()) {
                 currentDocumentStoreId++;
                 currentDocumentStore.close();
-                String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
+                String docStorePath = getDocumentStorePathString(currentDocumentStoreId);
                 if (currentDocumentStoreId < numStores) {
                     currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
                 }
@@ -479,7 +487,7 @@ public class InvertedIndexManager {
      * @return number of index segments.
      */
     public int getNumSegments() {
-        return numOfSeg;
+        return numSegments;
         //throw new UnsupportedOperationException();
     }
 
@@ -491,9 +499,9 @@ public class InvertedIndexManager {
      * @return in-memory data structure with all contents in the index segment, null if segmentNum don't exist.
      */
     public InvertedIndexSegmentForTest getIndexSegment(int segmentNum) {
-        if (segmentNum >= numOfSeg)
+        if (segmentNum >= numSegments)
             return null;
-        String docStorePath1 = indexFolder + "/docs" + segmentNum + ".db";
+        String docStorePath1 = getDocumentStorePathString(segmentNum);
         DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
         Iterator<Integer> itr = documentStore.keyIterator();
         Map<Integer, Document> documents = new HashMap<>();
