@@ -1,8 +1,6 @@
 package edu.uci.ics.cs221.index.inverted;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterators;
-import com.google.common.collect.Iterators.*;
 import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
@@ -370,18 +368,48 @@ public class InvertedIndexManager {
         // throw new UnsupportedOperationException();
     }
 
+    class DocumentIterator implements  Iterator<Document> {
+        int currentDocumentStoreId;
+        int currentDocumentId;
+        DocumentStore currentDocumentStore;
+
+        DocumentIterator() {
+            currentDocumentStoreId = 0;
+            currentDocumentId = 0;
+            String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
+            currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
+        }
+
+        @Override public boolean hasNext() {
+            if (currentDocumentStoreId < numStores) {
+                return true;
+            }
+            return false;
+        }
+
+        @Override public Document next() {
+            Document result = currentDocumentStore.getDocument(currentDocumentId);
+
+            currentDocumentId++;
+            if (currentDocumentId >= currentDocumentStore.size()) {
+                currentDocumentStoreId++;
+                String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
+                if (currentDocumentStoreId < numStores) {
+                    currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
+                }
+
+                currentDocumentId = 0;
+            }
+
+            return result;
+        }
+    }
+
     /**
      * Iterates through all the documents in all disk segments.
      */
     public Iterator<Document> documentIterator() {
-        /*
-        for (int i = 0; i <= numStores; i++){
-            String docStorePath = "./docs" + i + ".db";
-            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
-            documentStore.iterator().next().
-        }
-         */
-        throw new UnsupportedOperationException();
+        return new DocumentIterator();
     }
 
     /**
