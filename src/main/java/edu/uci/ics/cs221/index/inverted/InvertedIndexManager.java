@@ -111,12 +111,12 @@ public class InvertedIndexManager {
     }
 
     // Test cases fail if return Paths.get() directly here
-    private String getHeaderFilePathString() {
-        return indexFolder + "/header" + numSegments.toString() + ".txt";
+    private String getHeaderFilePathString(int segmentNum) {
+        return indexFolder + "/header" + segmentNum + ".txt";
     }
 
-    private String getSegmentFilePathString() {
-        return indexFolder + "/segment" + numSegments.toString() + ".txt";
+    private String getSegmentFilePathString(int segmentNum) {
+        return indexFolder + "/segment" + segmentNum + ".txt";
     }
 
     /**
@@ -130,8 +130,8 @@ public class InvertedIndexManager {
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
-        String path = getHeaderFilePathString();
-        String path1 = getSegmentFilePathString();
+        String path = getHeaderFilePathString(numSegments);
+        String path1 = getSegmentFilePathString(numSegments);
         int len = 0;
         numSegments += 1;
         Path filePath = Paths.get(path);
@@ -273,7 +273,7 @@ public class InvertedIndexManager {
         List<Document> results = new ArrayList<>();
         keyword = analyzer.analyze(keyword).get(0);
         for (int i = 0; i < getNumSegments(); i++) {
-            String headerFilePathString = indexFolder + "/header" + i + ".txt";
+            String headerFilePathString = getHeaderFilePathString(i);
             PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(Paths.get(headerFilePathString));
 
             ByteBuffer btf = pageFileChannel.readAllPages();
@@ -298,7 +298,7 @@ public class InvertedIndexManager {
                 return Collections.emptyIterator();
             }
 
-            String segmentFilePathString = getSegmentFilePathString();
+            String segmentFilePathString = getSegmentFilePathString(numSegments);
             PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
             byte[] docs = new byte[length * 4];
             int pages;
