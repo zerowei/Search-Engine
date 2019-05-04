@@ -5,6 +5,7 @@ import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -206,41 +207,70 @@ public class InvertedIndexManager {
         //throw new UnsupportedOperationException();
     }
 
+    class HeaderFileRow {
+        String keyword;
+        int pageId;
+        int offset;
+        int numOccurrence;
+    }
+
+    class HeaderFileRowIterator implements Iterator<HeaderFileRow> {
+        PageFileChannel file;
+        ByteBuffer buffer;
+        int pageNum, offset;
+
+        HeaderFileRowIterator(PageFileChannel file) {
+            this.file = file;
+            buffer = ByteBuffer.allocate(PAGE_SIZE);
+            offset = 0;
+            pageNum = 0;
+        }
+
+        @Override public boolean hasNext() {
+            throw new NotImplementedException();
+        }
+
+        @Override public HeaderFileRow next() {
+            throw new NotImplementedException();
+        }
+    }
+
+    private void mergeDocumentStores(int docStoreNumA, int docStoreNumB, int docStoreNumNew) {
+
+    }
+
     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
         int offsetHeaderFileA = 0, offsetHeaderFileB = 0;
         int offsetSegmentFileA = 0, offsetSegmentFileB = 0;
         int numDocumentA = 0;
 
-        Map<String, List<Integer>> invertedLists = getIndexSegment(segNumA).getInvertedLists();
-        Map<String, List<Integer>> invertedLists1 = getIndexSegment(segNumB).getInvertedLists();
-        for (List<Integer> intr : invertedLists1.values()) {
-            for (Integer obj : intr)
-                obj = obj + getIndexSegment(segNumA).getDocuments().size();
-        }
-        Map<String, List<Integer>> difference = new HashMap<>();
-        for (String str1 : invertedLists1.keySet()) {
-            for (String str : invertedLists.keySet()) {
-                if (!str.equals(str1)) {
-                    continue;
-                }
-                invertedLists.get(str).addAll(invertedLists1.get(str1));
+        PageFileChannel fileHeaderA     = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumA)));
+        PageFileChannel fileHeaderB     = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumB)));
+        PageFileChannel fileHeaderNew   = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumNew)));
+
+        PageFileChannel fileSegmenterA      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumA)));
+        PageFileChannel fileSegmenterB      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumB)));
+        PageFileChannel fileSegmenterNew    = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumNew)));
+
+        HeaderFileRowIterator headerFileRowIteratorA = new HeaderFileRowIterator(fileHeaderA);
+        HeaderFileRowIterator headerFileRowIteratorB = new HeaderFileRowIterator(fileHeaderB);
+
+        while (headerFileRowIteratorA.hasNext() && headerFileRowIteratorB.hasNext()) {
+            HeaderFileRow rowA = headerFileRowIteratorA.next();
+            HeaderFileRow rowB = headerFileRowIteratorB.next();
+
+            if (rowA.keyword.compareTo(rowB.keyword) == 0) {
+
+            } else if (rowA.keyword.compareTo(rowB.keyword) > 0) {
+
+            } else if (rowA.keyword.compareTo(rowB.keyword) < 0) {
+
             }
-            difference.put(str1, invertedLists1.get(str1));
         }
-        invertedLists.putAll(difference);
-        buffer.putAll(invertedLists);
-        flush();
-        buffer.clear();
-        docStorePath = "./docs" + segNumNew + ".db";
-        DocumentStore documentStore = MapdbDocStore.createOrOpen(docStorePath);
-        int size = getIndexSegment(segNumA).getDocuments().size();
-        for (int j = 0; j < size; j++) {
-            documentStore.addDocument(j, getIndexSegment(segNumA).getDocuments().get(j));
-        }
-        for (int k = 0; k < getIndexSegment(segNumB).getDocuments().size(); k++) {
-            documentStore.addDocument(size + k, getIndexSegment(segNumB).getDocuments().get(k));
-        }
-        documentStore.close();
+
+        mergeDocumentStores(segNumA, segNumB, segNumNew);
+
+        return;
     }
 
     /**
@@ -511,10 +541,10 @@ public class InvertedIndexManager {
             documents.put(inte, doc);
         }
         documentStore.close();
-        String path = indexFolder + "/header" + segmentNum + ".txt";
+        String path = getHeaderFilePathString(segmentNum);
         Path filePath = Paths.get(path);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
-        String path1 = indexFolder + "/segment" + segmentNum + ".txt";
+        String path1 = getSegmentFilePathString(segmentNum);
         Path filePath1 = Paths.get(path1);
         PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         ByteBuffer btf = pageFileChannel.readAllPages();
