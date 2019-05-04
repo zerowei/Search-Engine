@@ -84,7 +84,7 @@ public class InvertedIndexManager {
      */
     public void addDocument(Document document) {
         Preconditions.checkNotNull(document);
-        docStorePath = "./index/Team17/docs" + numStores.toString() + ".db";
+        docStorePath = indexFolder + "/docs" + numStores.toString() + ".db";
         documents.put(record, document);
         List<String> tokens = analyzer.analyze(document.getText());
         for (String token : tokens) {
@@ -119,8 +119,8 @@ public class InvertedIndexManager {
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
-        String path = "./index/Team17/header" + numOfSeg.toString() + ".txt";
-        String path1 = "./index/Team17/segment" + numOfSeg.toString() + ".txt";
+        String path = indexFolder + "/header" + numOfSeg.toString() + ".txt";
+        String path1 = indexFolder + "/segment" + numOfSeg.toString() + ".txt";
         int len = 0;
         int pageId, offset;
         numOfSeg += 1;
@@ -414,7 +414,7 @@ public class InvertedIndexManager {
     public InvertedIndexSegmentForTest getIndexSegment(int segmentNum) {
         if (segmentNum >= numOfSeg)
             return null;
-        String docStorePath1 = "./index/Team17/docs" + segmentNum + ".db";
+        String docStorePath1 = indexFolder + "/docs" + segmentNum + ".db";
         DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
         Iterator<Integer> itr = documentStore1.keyIterator();
         Map<Integer, Document> documents = new HashMap<>();
@@ -424,10 +424,10 @@ public class InvertedIndexManager {
             documents.put(inte, doc);
         }
         documentStore1.close();
-        String path = "./index/Team17/header" + segmentNum + ".txt";
+        String path = indexFolder + "/header" + segmentNum + ".txt";
         Path filePath = Paths.get(path);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
-        String path1 = "./index/Team17/segment" + segmentNum + ".txt";
+        String path1 = indexFolder + "/segment" + segmentNum + ".txt";
         Path filePath1 = Paths.get(path1);
         PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         ByteBuffer btf = pageFileChannel.readAllPages();
