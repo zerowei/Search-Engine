@@ -173,6 +173,10 @@ public class InvertedIndexManager {
         if (numOfSeg == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
             mergeAllSegments();
         }
+        numStores += 1;
+        record = 0;
+        buffer.clear();
+        documents.clear();
         /*
         PageFileChannel pagefile1 = PageFileChannel.createOrOpen(filePath);
         ByteBuffer btf = pagefile1.readPage(0);
