@@ -6,6 +6,7 @@ import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
 
+import javax.print.Doc;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -107,12 +108,12 @@ public class InvertedIndexManager {
         return;
     }
 
-    private Path getHeaderFilePath() {
-        return Paths.get(indexFolder + "/header" + numOfSeg.toString() + ".txt");
+    private String getHeaderFilePath() {
+        return indexFolder + "/header" + numOfSeg.toString() + ".txt";
     }
 
-    private Path getSegmentFilePath() {
-        return Paths.get(indexFolder + "/segment" + numOfSeg.toString() + ".txt");
+    private String getSegmentFilePath() {
+        return indexFolder + "/segment" + numOfSeg.toString() + ".txt";
     }
 
     /**
@@ -129,17 +130,20 @@ public class InvertedIndexManager {
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
 
-        int lenHeaderFileBuffer = 0;
+        String headerFilePath = getHeaderFilePath();
+        String segmentFilePath = getSegmentFilePath();
+
+        int len = 0;
         int pageId, offset;
         numOfSeg += 1;
-
-        PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(getHeaderFilePath());
+        Path filePath = Paths.get(headerFilePath);
+        PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
         for (String obj : buffer.keySet()) {
-            lenHeaderFileBuffer += obj.getBytes().length + 4 * 4;
+            len = len + obj.getBytes().length + 4 * 4;
         }
         pageId = 0;
         offset = 0;
-        ByteBuffer buf = ByteBuffer.allocate(lenHeaderFileBuffer);
+        ByteBuffer buf = ByteBuffer.allocate(len);
         for (String words : buffer.keySet()) {
             int wordSize = buffer.get(words).size();
             buf.putInt(words.length());
@@ -157,7 +161,8 @@ public class InvertedIndexManager {
         buf.clear();
         pageFileChannel.close();
 
-        PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(getSegmentFilePath());
+        Path filePath1 = Paths.get(segmentFilePath);
+        PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         int numOfInts = 0;
         for (List<Integer> appears : buffer.values()) {
             for (Integer i : appears) {
