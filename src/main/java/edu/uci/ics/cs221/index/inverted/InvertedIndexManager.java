@@ -6,6 +6,7 @@ import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
 
+import javax.print.Doc;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -103,7 +104,8 @@ public class InvertedIndexManager {
         if (record == DEFAULT_FLUSH_THRESHOLD) {
             flush();
         }
-        //throw new UnsupportedOperationException();
+
+        return;
     }
 
     /**
@@ -232,6 +234,23 @@ public class InvertedIndexManager {
         // throw new UnsupportedOperationException();
     }
 
+    class SearchQueryIterator implements  Iterator<Document> {
+        int currentSegmentId;
+
+        SearchQueryIterator() {
+            currentSegmentId = 0;
+
+        }
+
+        @Override public boolean hasNext() {
+            return false;
+        }
+
+        @Override public Document next() {
+            return null;
+        }
+    }
+
     /**
      * Performs a single keyword search on the inverted index.
      * You could assume the analyzer won't convert the keyword into multiple tokens.
@@ -246,6 +265,7 @@ public class InvertedIndexManager {
         if (keyword.equals("")) {
             return Collections.emptyIterator();
         }
+
         List<Document> results = new ArrayList<>();
         keyword = analyzer.analyze(keyword).get(0);
         for (int i = 0; i < getNumSegments(); i++) {
