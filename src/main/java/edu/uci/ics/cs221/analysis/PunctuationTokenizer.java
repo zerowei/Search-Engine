@@ -26,7 +26,7 @@ public class PunctuationTokenizer implements Tokenizer {
     public List<String> tokenize(String text) {
         NaiveAnalyzer analyzer = new NaiveAnalyzer();
         List<String> InitialToken = analyzer.analyze(text);
-        System.out.println("Initial tokens after NaiveAnalyzer: " + InitialToken);
+        //System.out.println("Initial tokens after NaiveAnalyzer: " + InitialToken);
         List<String> tokens = new ArrayList<>();
         if (InitialToken.size() != 0){
             for (Object Initial : InitialToken) {
@@ -44,7 +44,7 @@ public class PunctuationTokenizer implements Tokenizer {
         }
         tokens.remove("");
         tokens.removeAll(StopWords.stopWords);
-        System.out.println("Final tokens: " + tokens);
+        //System.out.println("Final tokens: " + tokens);
         return tokens;
     }
 }
