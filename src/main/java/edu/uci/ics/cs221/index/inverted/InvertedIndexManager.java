@@ -108,23 +108,35 @@ public class InvertedIndexManager {
         return;
     }
 
+    private String getHeaderFilePath() {
+        return indexFolder + "/header" + numOfSeg.toString() + ".txt";
+    }
+
+    private String getSegmentFilePath() {
+        return indexFolder + "/segment" + numOfSeg.toString() + ".txt";
+    }
+
     /**
      * Flushes all the documents in the in-memory segment buffer to disk. If the buffer is empty, it should not do anything.
      * flush() writes the segment to disk containing the posting list and the corresponding document store.
      */
     public void flush() {
+
         if (buffer.isEmpty()) {
             return;
         }
+
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
-        String path = indexFolder + "/header" + numOfSeg.toString() + ".txt";
-        String path1 = indexFolder + "/segment" + numOfSeg.toString() + ".txt";
+
+        String headerFilePath = getHeaderFilePath();
+        String segmentFilePath = getSegmentFilePath();
+
         int len = 0;
         int pageId, offset;
         numOfSeg += 1;
-        Path filePath = Paths.get(path);
+        Path filePath = Paths.get(headerFilePath);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
         for (String obj : buffer.keySet()) {
             len = len + obj.getBytes().length + 4 * 4;
@@ -149,7 +161,7 @@ public class InvertedIndexManager {
         buf.clear();
         pageFileChannel.close();
 
-        Path filePath1 = Paths.get(path1);
+        Path filePath1 = Paths.get(segmentFilePath);
         PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         int numOfInts = 0;
         for (List<Integer> appears : buffer.values()) {
@@ -169,6 +181,7 @@ public class InvertedIndexManager {
         if (numOfSeg == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
             mergeAllSegments();
         }
+
         numStores += 1;
         record = 0;
         buffer.clear();
