@@ -143,10 +143,10 @@ public class InvertedIndexManager {
         ByteBuffer buf = ByteBuffer.allocate(len);
 
         for (String word : buffer.keySet()) {
-
-            buf.putInt(word.length())                                                                                                                                                                               ;
             byte[] bytes = word.getBytes();
             System.out.println(new String(bytes));
+
+            buf.putInt(bytes.length);
             buf.put(bytes);
             int numOccurrence = buffer.get(word).size();
             System.out.println(word);
