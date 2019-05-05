@@ -362,17 +362,19 @@ public class InvertedIndexManager {
         ByteBuffer buffer;
         PageFileChannel file;
 
-        AutoFlushBuffer(ByteBuffer buffer, PageFileChannel file) {
-            this.buffer = buffer;
+        AutoFlushBuffer(PageFileChannel file) {
+            this.buffer = ByteBuffer.allocate(PAGE_SIZE * 10);
             this.file = file;
         }
 
         AutoFlushBuffer put(ByteBuffer bytes) {
+            System.out.println("putting " + bytes.toString());
+            bytes.rewind();
             buffer.put(bytes);
+            System.out.println("after putting " + buffer.toString());
 
-            if (buffer.position() > PAGE_SIZE * 10) {
-                file.appendAllBytes(buffer);
-                buffer.clear();
+            if (buffer.position() > PAGE_SIZE) {
+                flush();
             }
 
             return this;
@@ -470,8 +472,8 @@ public class InvertedIndexManager {
         HeaderFileRowIterator headerFileRowIteratorA = new HeaderFileRowIterator(fileHeaderA, fileSegmentA);
         HeaderFileRowIterator headerFileRowIteratorB = new HeaderFileRowIterator(fileHeaderB, fileSegmentB);
 
-        AutoFlushBuffer bufferHeaderFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileHeaderNew);
-        AutoFlushBuffer bufferSegmentFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileSegmentNew);
+        AutoFlushBuffer bufferHeaderFileNew = new AutoFlushBuffer(fileHeaderNew);
+        AutoFlushBuffer bufferSegmentFileNew = new AutoFlushBuffer(fileSegmentNew);
 
         DocumentStore documentStoreA = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segNumA));
         DocumentStore documentStoreB = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segNumB));
