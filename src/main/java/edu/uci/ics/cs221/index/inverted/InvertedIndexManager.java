@@ -881,7 +881,7 @@ public class InvertedIndexManager {
                 union.addAll(ir);
                 }
             System.out.println(union);
-            String docStorePath1 = indexFolder + "/docs" + i + ".db";
+            String docStorePath1 = getDocumentStorePathString(i);
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
             for (Integer e : union){
                 results.add(documentStore1.getDocument(e));
