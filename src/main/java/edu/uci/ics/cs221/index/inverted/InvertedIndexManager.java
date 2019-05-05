@@ -48,7 +48,6 @@ public class InvertedIndexManager {
     public Integer record = 0;
     public Integer numStores = 0;
     private Integer numSegments = 0;
-    public String docStorePath;
 
     private InvertedIndexManager(String indexFolder, Analyzer analyzer) {
         this.analyzer = analyzer;
@@ -88,7 +87,6 @@ public class InvertedIndexManager {
      */
     public void addDocument(Document document) {
         Preconditions.checkNotNull(document);
-        docStorePath = getDocumentStorePathString(numStores);
         documents.put(record, document);
         List<String> tokens = analyzer.analyze(document.getText());
         for (String token : tokens) {
@@ -129,7 +127,7 @@ public class InvertedIndexManager {
         }
         System.out.println(buffer);
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
-        DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
+        DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(getDocumentStorePathString(numSegments), itr);
         documentStore.close();
         String headerFilePathString = getHeaderFilePathString(numSegments);
         String segmentFilePathString = getSegmentFilePathString(numSegments);
