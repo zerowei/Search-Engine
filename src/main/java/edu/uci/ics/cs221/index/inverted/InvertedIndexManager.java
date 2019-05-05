@@ -5,7 +5,6 @@ import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
-import sun.jvm.hotspot.memory.HeapBlock;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.IOException;
@@ -236,6 +235,23 @@ public class InvertedIndexManager {
                     + "\tnumOcc " + numOccurrence
                     + "\t occu " + occurrenceList.toString();
         }
+
+        ByteBuffer getOccurrenceListByteBuffer() {
+            return listInt2ByteBuffer(occurrenceList);
+        }
+
+        ByteBuffer getHeaderRowByteBuffer() {
+            ByteBuffer result = ByteBuffer.allocate(keyword.length() + 4*4);
+
+            result.putInt(keyword.length());
+            result.put(keyword.getBytes());
+            result.putInt(pageId);
+            result.putInt(offset);
+            numOccurrence = occurrenceList.size();
+            result.putInt(numOccurrence);
+
+            return result;
+        }
     }
 
 
@@ -321,11 +337,9 @@ public class InvertedIndexManager {
             loadNextPageIfNecessary();
 
             row.keyword = new String(row.bytes);
-
             row.occurrenceList = getSegmentList(row.pageId, row.offset, row.numOccurrence);
 
-
-            System.out.println(row.toString());
+            //System.out.println(row.toString());
             return row;
         }
     }
@@ -343,7 +357,7 @@ public class InvertedIndexManager {
             this.file = file;
         }
 
-        AutoFlushBuffer put(byte[] bytes) {
+        AutoFlushBuffer put(ByteBuffer bytes) {
             buffer.put(bytes);
 
             if (buffer.position() > PAGE_SIZE * 10) {
@@ -361,18 +375,31 @@ public class InvertedIndexManager {
         }
     }
 
+    private ByteBuffer listInt2ByteBuffer(List<Integer> list) {
+        ByteBuffer result = ByteBuffer.allocate(list.size() * 4);
+        for (Integer i : list) {
+            result.putInt(i.intValue());
+        }
+
+        return result;
+    }
+
     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
         int offsetHeaderFileA = 0, offsetHeaderFileB = 0;
         int offsetSegmentFileA = 0, offsetSegmentFileB = 0;
         int numDocumentA = 0;
 
+        // To avoid the document store name duplicated with other existing ones, we name it to a temp name
+        // and then rename it after the old ones are deleted
+        final int segNumTemp = 99999;
+
         PageFileChannel fileHeaderA     = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumA)));
         PageFileChannel fileHeaderB     = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumB)));
-        PageFileChannel fileHeaderNew   = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumNew)));
+        PageFileChannel fileHeaderNew   = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumTemp)));
 
         PageFileChannel fileSegmentA      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumA)));
         PageFileChannel fileSegmentB      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumB)));
-        PageFileChannel fileSegmentNew    = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumNew)));
+        PageFileChannel fileSegmentNew    = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumTemp)));
 
         HeaderFileRowIterator headerFileRowIteratorA = new HeaderFileRowIterator(fileHeaderA, fileSegmentA);
         HeaderFileRowIterator headerFileRowIteratorB = new HeaderFileRowIterator(fileHeaderB, fileSegmentB);
@@ -380,21 +407,62 @@ public class InvertedIndexManager {
         AutoFlushBuffer bufferHeaderFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileHeaderNew);
         AutoFlushBuffer bufferSegmentFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileSegmentNew);
 
-        while (headerFileRowIteratorA.hasNext() && headerFileRowIteratorB.hasNext()) {
-            HeaderFileRow rowA = headerFileRowIteratorA.next();
-            HeaderFileRow rowB = headerFileRowIteratorB.next();
+        DocumentStore documentStoreA = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segNumA));
+        DocumentStore documentStoreB = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segNumB));
+        DocumentStore documentStoreNew = MapdbDocStore.createOrOpen(getDocumentStorePathString(segNumTemp));
 
-            System.out.println("row A keyword " + rowA.keyword);
-            System.out.println("row B keyword " + rowB.keyword);
+        for (Iterator<Map.Entry<Integer, Document>> it = documentStoreA.iterator(); it.hasNext();) {
+            Map.Entry<Integer, Document> docEntry = it.next();
+            documentStoreNew.addDocument(docEntry.getKey(), docEntry.getValue());
+        }
+        for (Iterator<Map.Entry<Integer, Document>> it = documentStoreB.iterator(); it.hasNext();) {
+            Map.Entry<Integer, Document> docEntry = it.next();
+            documentStoreNew.addDocument((int) (docEntry.getKey() + documentStoreA.size()), docEntry.getValue());
+        }
+
+        HeaderFileRow rowA = new HeaderFileRow(), rowB = new HeaderFileRow();
+        if (headerFileRowIteratorA.hasNext()) {
+            rowA = headerFileRowIteratorA.next();
+        }
+        if (headerFileRowIteratorB.hasNext()) {
+            rowB = headerFileRowIteratorB.next();
+        }
+        int newPageId = 0, newOffset = 0;
+
+        while (headerFileRowIteratorA.hasNext() && headerFileRowIteratorB.hasNext()) {
+
+            HeaderFileRow rowNew = new HeaderFileRow();
 
             if (rowA.keyword.compareTo(rowB.keyword) == 0) {
+                rowNew.keyword = rowA.keyword;
+                rowNew.occurrenceList = new ArrayList<>(rowA.occurrenceList.size() + rowB.occurrenceList.size());
+                rowNew.occurrenceList.addAll(rowA.occurrenceList);
 
+                for (int occur : rowB.occurrenceList) {
+                    // ToDo: maybe use long instead of int?
+                    rowNew.occurrenceList.add(new Integer((int) (occur + documentStoreA.size())));
+                }
+
+                System.out.println();
+                System.out.println("row A \t" + rowA.toString());
+                System.out.println("row B \t" + rowB.toString());
+                System.out.println("new row\t" + rowNew.toString());
+
+                rowA = headerFileRowIteratorA.next();
+                rowB = headerFileRowIteratorB.next();
             } else if (rowA.keyword.compareTo(rowB.keyword) > 0) {
 
             } else if (rowA.keyword.compareTo(rowB.keyword) < 0) {
 
             }
 
+            rowNew.pageId = newPageId;
+            rowNew.offset = newOffset;
+            bufferHeaderFileNew.put(rowNew.getHeaderRowByteBuffer());
+            bufferSegmentFileNew.put(rowNew.getOccurrenceListByteBuffer());
+
+            newPageId = newPageId + (newOffset + rowNew.numOccurrence * 4) / PAGE_SIZE;
+            newOffset = (newOffset + rowNew.numOccurrence * 4) % PAGE_SIZE;
         }
 
         while (headerFileRowIteratorA.hasNext()) {
@@ -408,14 +476,14 @@ public class InvertedIndexManager {
         bufferHeaderFileNew.flush();
         bufferSegmentFileNew.flush();
 
-        mergeDocumentStores(segNumA, segNumB, segNumNew);
-
         fileHeaderA.close();
         fileHeaderB.close();
         fileHeaderNew.close();
         fileSegmentA.close();
         fileSegmentB.close();
         fileSegmentNew.close();
+
+        // ToDo: remove old files A and B, and rename temp file to new segment files
 
         return;
     }
@@ -602,7 +670,7 @@ public class InvertedIndexManager {
                 word1.addAll(mix);
                 mix.clear();
             }
-            String docStorePath1 = indexFolder + "/docs" + i + ".db";
+            String docStorePath1 = getDocumentStorePathString(i);
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
             for (Integer e : word1){
                 results.add(documentStore1.getDocument(e));
