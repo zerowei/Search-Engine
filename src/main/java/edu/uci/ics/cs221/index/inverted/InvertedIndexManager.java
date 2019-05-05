@@ -417,9 +417,9 @@ public class InvertedIndexManager {
         List<Document> results = new ArrayList<>();
         keyword = analyzer.analyze(keyword).get(0);
         for (int i = 0; i < getNumSegments(); i++) {
-            String path = indexFolder + "/header" + i + ".txt";
-            Path filePath = Paths.get(path);
-            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
+            String headerFilePathString = getHeaderFilePathString(i);
+            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(Paths.get(headerFilePathString));
+
             ByteBuffer btf = pageFileChannel.readAllPages();
             btf.flip();
             int pageID=0, offset=0, length=0;
@@ -441,9 +441,9 @@ public class InvertedIndexManager {
             if (!key.equals(keyword)){
                 return Collections.emptyIterator();
             }
-            String path1 = indexFolder + "/segment" + i + ".txt";
-            Path filePath1 = Paths.get(path1);
-            PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
+
+            String segmentFilePathString = getSegmentFilePathString(numSegments);
+            PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
             byte[] docs = new byte[length * 4];
             int pages;
             if (length*4 <= PAGE_SIZE - offset*4) {
@@ -471,7 +471,7 @@ public class InvertedIndexManager {
                 int docID = dor.getInt();
                 docIDs.add(docID);
             }
-            String docStorePath1 = indexFolder + "/docs" + i + ".db";
+            String docStorePath1 = getDocumentStorePathString(i);
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
             for (Integer e : docIDs){
                 results.add(documentStore1.getDocument(e));
@@ -481,7 +481,7 @@ public class InvertedIndexManager {
             pageFileChannel1.close();
         }
         return results.iterator();
-        //throw new UnsupportedOperationException();
+         //throw new UnsupportedOperationException();
     }
 
     /**
@@ -516,7 +516,7 @@ public class InvertedIndexManager {
                 int length = btf.getInt();
                 List<Integer> paras = Arrays.asList(pageID, offset, length);
                 header.put(key, paras);
-            }
+                }
             btf.clear();
             List<String> keys = new ArrayList<>(header.keySet());
             List<Set<Integer>> listOfWords = new ArrayList<>();
@@ -690,7 +690,7 @@ public class InvertedIndexManager {
             Set<Integer> union = new HashSet<>();
             for (Set<Integer> ir : listOfWords){
                 union.addAll(ir);
-            }
+                }
             String docStorePath1 = indexFolder + "/docs" + i + ".db";
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
             for (Integer e : union){
@@ -710,15 +710,12 @@ public class InvertedIndexManager {
         DocumentIterator() {
             currentDocumentStoreId = 0;
             currentDocumentId = 0;
-            String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
+            String docStorePath = getDocumentStorePathString(currentDocumentStoreId);
             currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
         }
 
         @Override public boolean hasNext() {
-            if (currentDocumentStoreId < numStores) {
-                return true;
-            }
-            return false;
+            return currentDocumentStoreId < numStores;
         }
 
         @Override public Document next() {
@@ -728,7 +725,7 @@ public class InvertedIndexManager {
             if (currentDocumentId >= currentDocumentStore.size()) {
                 currentDocumentStoreId++;
                 currentDocumentStore.close();
-                String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
+                String docStorePath = getDocumentStorePathString(currentDocumentStoreId);
                 if (currentDocumentStoreId < numStores) {
                     currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
                 }
@@ -777,20 +774,20 @@ public class InvertedIndexManager {
     public InvertedIndexSegmentForTest getIndexSegment(int segmentNum) {
         if (segmentNum >= numSegments)
             return null;
-        String docStorePath1 = indexFolder + "/docs" + segmentNum + ".db";
-        DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
-        Iterator<Integer> itr = documentStore1.keyIterator();
+        String docStorePath1 = getDocumentStorePathString(segmentNum);
+        DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
+        Iterator<Integer> itr = documentStore.keyIterator();
         Map<Integer, Document> documents = new HashMap<>();
         while (itr.hasNext()) {
             Integer inte = itr.next();
-            Document doc = documentStore1.getDocument(inte);
+            Document doc = documentStore.getDocument(inte);
             documents.put(inte, doc);
         }
-        documentStore1.close();
-        String path = indexFolder + "/header" + segmentNum + ".txt";
+        documentStore.close();
+        String path = getHeaderFilePathString(segmentNum);
         Path filePath = Paths.get(path);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
-        String path1 = indexFolder + "/segment" + segmentNum + ".txt";
+        String path1 = getSegmentFilePathString(segmentNum);
         Path filePath1 = Paths.get(path1);
         PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         ByteBuffer btf = pageFileChannel.readAllPages();
