@@ -153,11 +153,12 @@ public class InvertedIndexManager {
 
             int numOccurrence = buffer.get(word).size();
             buf.putInt(pageId).putInt(offset).putInt(numOccurrence);
-            if (numOccurrence * 4 < PAGE_SIZE - offset) {
-                offset += numOccurrence * 4;
+            int lenOccurInBytes = numOccurrence * 4;
+            if (lenOccurInBytes < PAGE_SIZE - offset) {
+                offset += lenOccurInBytes;
             } else {
-                pageId = pageId + 1 + (numOccurrence * 4 - (PAGE_SIZE - offset)) / PAGE_SIZE;
-                offset = (numOccurrence * 4 - (PAGE_SIZE - offset)) % PAGE_SIZE;
+                pageId = pageId + 1 + (lenOccurInBytes - (PAGE_SIZE - offset)) / PAGE_SIZE;
+                offset = (lenOccurInBytes - (PAGE_SIZE - offset)) % PAGE_SIZE;
             }
         }
 
