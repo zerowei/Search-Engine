@@ -126,6 +126,7 @@ public class InvertedIndexManager {
         if (buffer.isEmpty()) {
             return;
         }
+        System.out.println(buffer);
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
@@ -135,7 +136,6 @@ public class InvertedIndexManager {
         numSegments += 1;
         Path filePath = Paths.get(headerFilePathString);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
-
         for (String obj : buffer.keySet()) {
             len = len + obj.getBytes().length + 4 * 4;
         }
@@ -146,11 +146,16 @@ public class InvertedIndexManager {
 
         for (String word : buffer.keySet()) {
 
-            buf.putInt(word.length());
+            buf.putInt(word.length())                                                                                                                                                                               ;
             byte[] bytes = word.getBytes();
+            System.out.println(new String(bytes));
             buf.put(bytes);
-
             int numOccurrence = buffer.get(word).size();
+            System.out.println(word);
+            System.out.println(word.length());
+            System.out.println(pageId);
+            System.out.println(offset);
+            System.out.println(numOccurrence);
             buf.putInt(pageId).putInt(offset).putInt(numOccurrence);
             // ToDo: fix the offset part in the getIndexSegement()
             int lenOccurInBytes = numOccurrence * 4;
@@ -161,7 +166,6 @@ public class InvertedIndexManager {
                 offset = (lenOccurInBytes - (PAGE_SIZE - offset)) % PAGE_SIZE;
             }
         }
-
         pageFileChannel.appendAllBytes(buf);
         buf.clear();
         pageFileChannel.close();
@@ -550,19 +554,24 @@ public class InvertedIndexManager {
                     break;
                 }
             }
+            System.out.println(key);
+            System.out.println(pageID);
+            System.out.println(offset);
+            System.out.println(length);
             if (!key.equals(keyword)){
                 return Collections.emptyIterator();
             }
 
-            String segmentFilePathString = getSegmentFilePathString(numSegments);
+            String segmentFilePathString = getSegmentFilePathString(i);
+            System.out.println(segmentFilePathString);
             PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
             byte[] docs = new byte[length * 4];
             int pages;
-            if (length*4 <= PAGE_SIZE - offset*4) {
+            if (length*4 <= PAGE_SIZE - offset) {
                 pages = 1;
             } else {
-                int extraPages = (length*4 - (PAGE_SIZE - offset*4)) / PAGE_SIZE;
-                int pos = (length*4 - (PAGE_SIZE - offset*4)) % PAGE_SIZE;
+                int extraPages = (length*4 - (PAGE_SIZE - offset)) / PAGE_SIZE;
+                int pos = (length*4 - (PAGE_SIZE - offset)) % PAGE_SIZE;
                 if (pos == 0) {
                     pages = extraPages + 1;
                 } else {
@@ -573,7 +582,7 @@ public class InvertedIndexManager {
             for (int j = 0; j < pages; j++) {
                 buf.put(pageFileChannel1.readPage(pageID + j));
             }
-            buf.position(offset * 4);
+            buf.position(offset);
             buf.get(docs, 0, length * 4);
             ByteBuffer dor = ByteBuffer.allocate(length * 4);
             dor.put(docs);
@@ -581,6 +590,7 @@ public class InvertedIndexManager {
             List<Integer> docIDs = new ArrayList<>();
             while (dor.hasRemaining()) {
                 int docID = dor.getInt();
+                System.out.println(docID);
                 docIDs.add(docID);
             }
             String docStorePath1 = getDocumentStorePathString(i);
@@ -698,11 +708,11 @@ public class InvertedIndexManager {
         PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         byte[] docs = new byte[length * 4];
         int pages;
-        if (length*4 <= PAGE_SIZE - offset*4) {
+        if (length*4 <= PAGE_SIZE - offset) {
             pages = 1;
         } else {
-            int extraPages = (length*4 - (PAGE_SIZE - offset*4)) / PAGE_SIZE;
-            int pos = (length*4 - (PAGE_SIZE - offset*4)) % PAGE_SIZE;
+            int extraPages = (length*4 - (PAGE_SIZE - offset)) / PAGE_SIZE;
+            int pos = (length*4 - (PAGE_SIZE - offset)) % PAGE_SIZE;
             if (pos == 0) {
                 pages = extraPages + 1;
             } else {
@@ -713,7 +723,7 @@ public class InvertedIndexManager {
         for (int j = 0; j < pages; j++) {
             buf.put(pageFileChannel1.readPage(pageID + j));
         }
-        buf.position(offset * 4);
+        buf.position(offset);
         buf.get(docs, 0, length * 4);
         ByteBuffer dor = ByteBuffer.allocate(length * 4);
         dor.put(docs);
@@ -759,6 +769,7 @@ public class InvertedIndexManager {
                 List<Integer> paras = Arrays.asList(pageID, offset, length);
                 header.put(key, paras);
             }
+            System.out.println(header);
             btf.clear();
             List<String> keys = new ArrayList<>(header.keySet());
             List<Set<Integer>> listOfWords = new ArrayList<>();
@@ -782,6 +793,7 @@ public class InvertedIndexManager {
                         List<Integer> nums = header.get(key);
                         Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
                         listOfWords.add(docIDs);
+                        System.out.println(listOfWords);
                         break;
                     } else if (keyword.compareTo(key) > 0) {
                         low = mid + 1;
@@ -796,6 +808,7 @@ public class InvertedIndexManager {
                 else {
                     low = 0;
                     high = keys.size() - 1;
+                    mid = -1;
                     lastWord = "";
                 }
             }
@@ -803,6 +816,7 @@ public class InvertedIndexManager {
             for (Set<Integer> ir : listOfWords){
                 union.addAll(ir);
                 }
+            System.out.println(union);
             String docStorePath1 = indexFolder + "/docs" + i + ".db";
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
             for (Integer e : union){
@@ -884,8 +898,9 @@ public class InvertedIndexManager {
      * @return in-memory data structure with all contents in the index segment, null if segmentNum don't exist.
      */
     public InvertedIndexSegmentForTest getIndexSegment(int segmentNum) {
-        if (segmentNum >= numSegments)
+        if (segmentNum >= numSegments) {
             return null;
+        }
         String docStorePath1 = getDocumentStorePathString(segmentNum);
         DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
         Iterator<Integer> itr = documentStore.keyIterator();
@@ -915,32 +930,40 @@ public class InvertedIndexManager {
         Map<String, List<Integer>> invertedLists = new TreeMap<>();
         while (btf.hasRemaining()) {
             int wordLength = btf.getInt();
+            System.out.println(wordLength);
             if (wordLength == 0)
                 break;
             byte[] dst = new byte[wordLength];
+            System.out.println(btf.position());
             btf.get(dst, 0, wordLength);
+            System.out.println(btf.position());
             String keyWord = new String(dst);
             int pageID = btf.getInt();
             int offset = btf.getInt();
             int length = btf.getInt();
+            System.out.println(keyWord);
             byte[] docs = new byte[length * 4];
             int pages;
-            if (length <= PAGE_SIZE - offset*4) {
+            System.out.println(pageID);
+            System.out.println(offset);
+            System.out.println(length);
+            if (length*4 <= PAGE_SIZE - offset) {
                 pages = 1;
             } else {
-                int extraPages = (length - (PAGE_SIZE - offset*4)) / PAGE_SIZE;
-                int pos = (length - (PAGE_SIZE - offset*4)) % PAGE_SIZE;
+                int extraPages = (length*4 - (PAGE_SIZE - offset)) / PAGE_SIZE;
+                int pos = (length*4 - (PAGE_SIZE - offset)) % PAGE_SIZE;
                 if (pos == 0) {
                     pages = extraPages + 1;
                 } else {
                     pages = extraPages + 2;
                 }
             }
+            System.out.println(pages);
             ByteBuffer buf = ByteBuffer.allocate(pages * PAGE_SIZE);
             for (int i = 0; i < pages; i++) {
                 buf.put(pageFileChannel1.readPage(pageID + i));
             }
-            buf.position(offset * 4);
+            buf.position(offset);
             buf.get(docs, 0, length * 4);
             ByteBuffer dor = ByteBuffer.allocate(length * 4);
             dor.put(docs);
@@ -952,6 +975,7 @@ public class InvertedIndexManager {
             }
             invertedLists.put(keyWord, docIDs);
         }
+        System.out.println(invertedLists);
         pageFileChannel.close();
         pageFileChannel1.close();
 
