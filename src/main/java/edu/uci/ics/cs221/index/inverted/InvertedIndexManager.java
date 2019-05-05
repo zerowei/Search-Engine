@@ -46,7 +46,6 @@ public class InvertedIndexManager {
     public TreeMap<String, List<Integer>> buffer = new TreeMap<>();
     public Map<Integer, Document> documents = new TreeMap<>();
     public Integer record = 0;
-    public Integer numStores = 0;
     private Integer numSegments = 0;
 
     private InvertedIndexManager(String indexFolder, Analyzer analyzer) {
@@ -189,7 +188,7 @@ public class InvertedIndexManager {
             mergeAllSegments();
         }
 
-        numStores += 1;
+        numSegments += 1;
         record = 0;
         buffer.clear();
         documents.clear();
@@ -903,7 +902,7 @@ public class InvertedIndexManager {
         }
 
         @Override public boolean hasNext() {
-            return currentDocumentStoreId < numStores;
+            return currentDocumentStoreId < numSegments;
         }
 
         @Override public Document next() {
@@ -914,7 +913,7 @@ public class InvertedIndexManager {
                 currentDocumentStoreId++;
                 currentDocumentStore.close();
                 String docStorePath = getDocumentStorePathString(currentDocumentStoreId);
-                if (currentDocumentStoreId < numStores) {
+                if (currentDocumentStoreId < numSegments) {
                     currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
                 }
 
