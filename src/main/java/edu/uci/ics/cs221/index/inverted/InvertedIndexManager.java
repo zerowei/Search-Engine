@@ -5,6 +5,7 @@ import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -45,7 +46,7 @@ public class InvertedIndexManager {
     public Map<Integer, Document> documents = new TreeMap<>();
     public Integer record = 0;
     public Integer numStores = 0;
-    private Integer numOfSeg = 0;
+    private Integer numSegments = 0;
     public String docStorePath;
 
     private InvertedIndexManager(String indexFolder, Analyzer analyzer) {
@@ -74,6 +75,10 @@ public class InvertedIndexManager {
         }
     }
 
+    private String getDocumentStorePathString(int storeNum) {
+        return indexFolder + "/docs" + storeNum + ".db";
+    }
+
     /**
      * Adds a document to the inverted index.
      * Document should live in a in-memory buffer until `flush()` is called to write the segment to disk.
@@ -82,7 +87,7 @@ public class InvertedIndexManager {
      */
     public void addDocument(Document document) {
         Preconditions.checkNotNull(document);
-        docStorePath = indexFolder + "/docs" + numStores.toString() + ".db";
+        docStorePath = getDocumentStorePathString(numStores);
         documents.put(record, document);
         List<String> tokens = analyzer.analyze(document.getText());
         for (String token : tokens) {
@@ -104,6 +109,15 @@ public class InvertedIndexManager {
         //throw new UnsupportedOperationException();
     }
 
+    // Test cases fail if return Paths.get() directly here
+    private String getHeaderFilePathString(int segmentNum) {
+        return indexFolder + "/header" + segmentNum + ".txt";
+    }
+
+    private String getSegmentFilePathString(int segmentNum) {
+        return indexFolder + "/segment" + segmentNum + ".txt";
+    }
+
     /**
      * Flushes all the documents in the in-memory segment buffer to disk. If the buffer is empty, it should not do anything.
      * flush() writes the segment to disk containing the posting list and the corresponding document store.
@@ -115,32 +129,37 @@ public class InvertedIndexManager {
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
-        String path = indexFolder + "/header" + numOfSeg.toString() + ".txt";
-        String path1 = indexFolder + "/segment" + numOfSeg.toString() + ".txt";
+        String path = getHeaderFilePathString(numSegments);
+        String path1 = getSegmentFilePathString(numSegments);
         int len = 0;
-        int pageId, offset;
-        numOfSeg += 1;
+        numSegments += 1;
         Path filePath = Paths.get(path);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
+
         for (String obj : buffer.keySet()) {
             len = len + obj.getBytes().length + 4 * 4;
         }
-        pageId = 0;
-        offset = 0;
+
+        int pageId = 0, offset = 0;
+
         ByteBuffer buf = ByteBuffer.allocate(len);
-        for (String words : buffer.keySet()) {
-            int wordSize = buffer.get(words).size();
-            buf.putInt(words.length());
-            byte[] bytes = words.getBytes();
+
+        for (String word : buffer.keySet()) {
+
+            buf.putInt(word.length());
+            byte[] bytes = word.getBytes();
             buf.put(bytes);
-            buf.putInt(pageId).putInt(offset).putInt(wordSize);
-            if (wordSize < PAGE_SIZE - offset) {
-                offset += wordSize;
+
+            int numOccurrence = buffer.get(word).size();
+            buf.putInt(pageId).putInt(offset).putInt(numOccurrence);
+            if (numOccurrence < PAGE_SIZE - offset) {
+                offset += numOccurrence;
             } else {
-                pageId = pageId + 1 + (wordSize - (PAGE_SIZE - offset)) / PAGE_SIZE;
-                offset = (wordSize - (PAGE_SIZE - offset)) % PAGE_SIZE;
+                pageId = pageId + 1 + (numOccurrence - (PAGE_SIZE - offset)) / PAGE_SIZE;
+                offset = (numOccurrence - (PAGE_SIZE - offset)) % PAGE_SIZE;
             }
         }
+
         pageFileChannel.appendAllBytes(buf);
         buf.clear();
         pageFileChannel.close();
@@ -149,10 +168,9 @@ public class InvertedIndexManager {
         PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         int numOfInts = 0;
         for (List<Integer> appears : buffer.values()) {
-            for (Integer i : appears) {
-                numOfInts++;
-            }
+            numOfInts += appears.size();
         }
+
         ByteBuffer byteBuffer = ByteBuffer.allocate(numOfInts * 4);
         for (List<Integer> appears : buffer.values()) {
             for (Integer i : appears) {
@@ -162,7 +180,7 @@ public class InvertedIndexManager {
         pageFileChannel1.appendAllBytes(byteBuffer);
         byteBuffer.clear();
         pageFileChannel1.close();
-        if (numOfSeg == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
+        if (numSegments == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
             mergeAllSegments();
         }
         numStores += 1;
@@ -187,47 +205,199 @@ public class InvertedIndexManager {
         //throw new UnsupportedOperationException();
     }
 
+    class HeaderFileRow {
+        int lenWords;
+        byte[] bytes;
+        int pageId;
+        int offset;
+        int numOccurrence;
+        String keyword;
+
+        @Override
+        public String toString() {
+            return "keyword: " + keyword
+                    + "\tpageId: " + pageId
+                    + "\toffset: " + offset
+                    + "\tnumOcc " + numOccurrence
+                    + "\n";
+        }
+    }
+
+    // Since the underlying file is based on pages, we need such an iterator to make life easier
+    class HeaderFileRowIterator implements Iterator<HeaderFileRow> {
+        PageFileChannel file;
+        ByteBuffer buffer;
+        int pageNum, offset;
+        int nextWordLength;
+
+        HeaderFileRowIterator(PageFileChannel file) {
+            this.file = file;
+            buffer = null;
+
+            offset = 0;
+            pageNum = 0;
+            if (pageNum < file.getNumPages()) {
+                buffer = file.readPage(pageNum);
+            }
+        }
+
+        @Override public boolean hasNext() {
+            if (pageNum >= file.getNumPages()) {
+                return false;
+            }
+
+            int nextLenWord = buffer.getInt();
+            buffer.position(buffer.position()-4);
+
+            if (nextLenWord > 0) {
+                return true;
+            }
+
+            return false;
+        }
+
+        private void loadNextPageIfNecessary() {
+            if (buffer.position() >= buffer.capacity()) {
+                buffer.clear();
+                pageNum++;
+
+                if (pageNum < file.getNumPages()) {
+                    buffer = file.readPage(pageNum);
+                }
+            }
+
+        }
+
+        @Override public HeaderFileRow next() {
+            HeaderFileRow row = new HeaderFileRow();
+            row.lenWords = buffer.getInt();
+            loadNextPageIfNecessary();
+            row.bytes = new byte[row.lenWords];
+            loadNextPageIfNecessary();
+            for (int i = 0; i < row.lenWords; i++) {
+                buffer.get(row.bytes, i, 1);
+                loadNextPageIfNecessary();
+            }
+            row.pageId = buffer.getInt();
+            loadNextPageIfNecessary();
+            row.offset = buffer.getInt();
+            loadNextPageIfNecessary();
+            row.numOccurrence = buffer.getInt();
+            loadNextPageIfNecessary();
+
+            row.keyword = new String(row.bytes);
+
+            System.out.println(row.toString());
+
+            return row;
+        }
+    }
+
+    private void mergeDocumentStores(int docStoreNumA, int docStoreNumB, int docStoreNumNew) {
+
+    }
+
+    private void flushBufferIfNeeded(ByteBuffer buffer, PageFileChannel file) {
+        if (buffer.position() > PAGE_SIZE * 10) {
+            file.appendAllBytes(buffer);
+            buffer.clear();
+        }
+    }
+
+    class AutoFlushBuffer {
+        ByteBuffer buffer;
+        PageFileChannel file;
+
+        AutoFlushBuffer(ByteBuffer buffer, PageFileChannel file) {
+            this.buffer = buffer;
+            this.file = file;
+        }
+
+        AutoFlushBuffer put(byte[] bytes) {
+            buffer.put(bytes);
+
+            if (buffer.position() > PAGE_SIZE * 10) {
+                file.appendAllBytes(buffer);
+                buffer.clear();
+            }
+
+            return this;
+        }
+
+        AutoFlushBuffer flush() {
+            file.appendAllBytes(buffer);
+            buffer.clear();
+            return this;
+        }
+    }
+
+    private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
+        int offsetHeaderFileA = 0, offsetHeaderFileB = 0;
+        int offsetSegmentFileA = 0, offsetSegmentFileB = 0;
+        int numDocumentA = 0;
+
+        PageFileChannel fileHeaderA     = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumA)));
+        PageFileChannel fileHeaderB     = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumB)));
+        PageFileChannel fileHeaderNew   = PageFileChannel.createOrOpen(Paths.get(getHeaderFilePathString(segNumNew)));
+
+        PageFileChannel fileSegmentA      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumA)));
+        PageFileChannel fileSegmentB      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumB)));
+        PageFileChannel fileSegmentNew    = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumNew)));
+
+        HeaderFileRowIterator headerFileRowIteratorA = new HeaderFileRowIterator(fileHeaderA);
+        HeaderFileRowIterator headerFileRowIteratorB = new HeaderFileRowIterator(fileHeaderB);
+
+        AutoFlushBuffer bufferHeaderFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileHeaderNew);
+        AutoFlushBuffer bufferSegmentFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileSegmentNew);
+
+        while (headerFileRowIteratorA.hasNext() && headerFileRowIteratorB.hasNext()) {
+            HeaderFileRow rowA = headerFileRowIteratorA.next();
+            HeaderFileRow rowB = headerFileRowIteratorB.next();
+
+            if (rowA.keyword.compareTo(rowB.keyword) == 0) {
+
+            } else if (rowA.keyword.compareTo(rowB.keyword) > 0) {
+
+            } else if (rowA.keyword.compareTo(rowB.keyword) < 0) {
+
+            }
+
+        }
+
+        while (headerFileRowIteratorA.hasNext()) {
+
+        }
+
+        while (headerFileRowIteratorB.hasNext()) {
+
+        }
+
+        bufferHeaderFileNew.flush();
+        bufferSegmentFileNew.flush();
+
+        mergeDocumentStores(segNumA, segNumB, segNumNew);
+
+        fileHeaderA.close();
+        fileHeaderB.close();
+        fileHeaderNew.close();
+        fileSegmentA.close();
+        fileSegmentB.close();
+        fileSegmentNew.close();
+
+        return;
+    }
+
     /**
      * Merges all the disk segments of the inverted index pair-wise.
      */
     public void mergeAllSegments() {
         // merge only happens at even number of segments
         Preconditions.checkArgument(getNumSegments() % 2 == 0);
-        numOfSeg = 0;
-        numStores = 0;
-        for (int i = 0; i <= InvertedIndexManager.DEFAULT_MERGE_THRESHOLD - 2; i = i + 2) {
-            Map<String, List<Integer>> invertedLists = getIndexSegment(i).getInvertedLists();
-            Map<String, List<Integer>> invertedLists1 = getIndexSegment(i + 1).getInvertedLists();
-            for (List<Integer> intr : invertedLists1.values()) {
-                for (Integer obj : intr)
-                    obj = obj + getIndexSegment(i).getDocuments().size();
-            }
-            Map<String, List<Integer>> difference = new HashMap<>();
-            for (String str1 : invertedLists1.keySet()) {
-                for (String str : invertedLists.keySet()) {
-                    if (!str.equals(str1)) {
-                        continue;
-                    }
-                    invertedLists.get(str).addAll(invertedLists1.get(str1));
-                }
-                difference.put(str1, invertedLists1.get(str1));
-            }
-            invertedLists.putAll(difference);
-            buffer.putAll(invertedLists);
-            flush();
-            buffer.clear();
-            docStorePath = "./docs" + i / 2 + ".db";
-            DocumentStore documentStore = MapdbDocStore.createOrOpen(docStorePath);
-            int size = getIndexSegment(i).getDocuments().size();
-            for (int j = 0; j < size; j++) {
-                documentStore.addDocument(j, getIndexSegment(i).getDocuments().get(j));
-            }
-            for (int k = 0; k < getIndexSegment(i + 1).getDocuments().size(); k++) {
-                documentStore.addDocument(size + k, getIndexSegment(i + 1).getDocuments().get(k));
-            }
-            documentStore.close();
+
+        for (int i = 0; i < numSegments; i+=2) {
+            mergeSegments(i, i+1, i/2);
         }
-        // throw new UnsupportedOperationException();
+        numSegments /= 2;
     }
 
     /**
@@ -247,9 +417,9 @@ public class InvertedIndexManager {
         List<Document> results = new ArrayList<>();
         keyword = analyzer.analyze(keyword).get(0);
         for (int i = 0; i < getNumSegments(); i++) {
-            String path = indexFolder + "/header" + i + ".txt";
-            Path filePath = Paths.get(path);
-            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
+            String headerFilePathString = getHeaderFilePathString(i);
+            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(Paths.get(headerFilePathString));
+
             ByteBuffer btf = pageFileChannel.readAllPages();
             btf.flip();
             int pageID=0, offset=0, length=0;
@@ -271,9 +441,9 @@ public class InvertedIndexManager {
             if (!key.equals(keyword)){
                 return Collections.emptyIterator();
             }
-            String path1 = indexFolder + "/segment" + i + ".txt";
-            Path filePath1 = Paths.get(path1);
-            PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
+
+            String segmentFilePathString = getSegmentFilePathString(numSegments);
+            PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
             byte[] docs = new byte[length * 4];
             int pages;
             if (length*4 <= PAGE_SIZE - offset*4) {
@@ -301,7 +471,7 @@ public class InvertedIndexManager {
                 int docID = dor.getInt();
                 docIDs.add(docID);
             }
-            String docStorePath1 = indexFolder + "/docs" + i + ".db";
+            String docStorePath1 = getDocumentStorePathString(i);
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
             for (Integer e : docIDs){
                 results.add(documentStore1.getDocument(e));
@@ -540,15 +710,12 @@ public class InvertedIndexManager {
         DocumentIterator() {
             currentDocumentStoreId = 0;
             currentDocumentId = 0;
-            String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
+            String docStorePath = getDocumentStorePathString(currentDocumentStoreId);
             currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
         }
 
         @Override public boolean hasNext() {
-            if (currentDocumentStoreId < numStores) {
-                return true;
-            }
-            return false;
+            return currentDocumentStoreId < numStores;
         }
 
         @Override public Document next() {
@@ -558,7 +725,7 @@ public class InvertedIndexManager {
             if (currentDocumentId >= currentDocumentStore.size()) {
                 currentDocumentStoreId++;
                 currentDocumentStore.close();
-                String docStorePath = indexFolder + "/docs" + currentDocumentStoreId + ".db";
+                String docStorePath = getDocumentStorePathString(currentDocumentStoreId);
                 if (currentDocumentStoreId < numStores) {
                     currentDocumentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath);
                 }
@@ -593,7 +760,7 @@ public class InvertedIndexManager {
      * @return number of index segments.
      */
     public int getNumSegments() {
-        return numOfSeg;
+        return numSegments;
         //throw new UnsupportedOperationException();
     }
 
@@ -605,22 +772,22 @@ public class InvertedIndexManager {
      * @return in-memory data structure with all contents in the index segment, null if segmentNum don't exist.
      */
     public InvertedIndexSegmentForTest getIndexSegment(int segmentNum) {
-        if (segmentNum >= numOfSeg)
+        if (segmentNum >= numSegments)
             return null;
-        String docStorePath1 = indexFolder + "/docs" + segmentNum + ".db";
-        DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
-        Iterator<Integer> itr = documentStore1.keyIterator();
+        String docStorePath1 = getDocumentStorePathString(segmentNum);
+        DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
+        Iterator<Integer> itr = documentStore.keyIterator();
         Map<Integer, Document> documents = new HashMap<>();
         while (itr.hasNext()) {
             Integer inte = itr.next();
-            Document doc = documentStore1.getDocument(inte);
+            Document doc = documentStore.getDocument(inte);
             documents.put(inte, doc);
         }
-        documentStore1.close();
-        String path = indexFolder + "/header" + segmentNum + ".txt";
+        documentStore.close();
+        String path = getHeaderFilePathString(segmentNum);
         Path filePath = Paths.get(path);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
-        String path1 = indexFolder + "/segment" + segmentNum + ".txt";
+        String path1 = getSegmentFilePathString(segmentNum);
         Path filePath1 = Paths.get(path1);
         PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
         ByteBuffer btf = pageFileChannel.readAllPages();
