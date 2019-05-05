@@ -409,25 +409,43 @@ public class InvertedIndexManager {
                 System.out.println("Failed to delete " + name);
             }
         }
+
+        return;
     }
 
     private void renameAllFiles(int oldSegNum, int newSegNum) {
-        /*
-        List<String> fileNamesToDelete = Arrays.asList(
-                getHeaderFilePathString(segNum),
-                getSegmentFilePathString(segNum),
-                getDocumentStorePathString(segNum)
-        );
+        Map<String, String> fileNamesToRename = new HashMap<String, String>() {{
+            put(getHeaderFilePathString(oldSegNum), getHeaderFilePathString(newSegNum));
+            put(getSegmentFilePathString(oldSegNum), getSegmentFilePathString(newSegNum));
+        }};
 
-        for (String name: fileNamesToDelete) {
-            File file = new File(name);
-            if ( file.delete() ) {
-                System.out.println("Deleted " + name + " successfully");
+        for (Map.Entry<String,String> entry : fileNamesToRename.entrySet()) {
+            File file = new File(entry.getKey());
+            if ( file.renameTo(new File(entry.getValue()))) {
+                System.out.println("Rename " + entry.getKey() + " to " + entry.getValue() + " successfully");
             } else {
-                System.out.println("Failed to delete " + name);
+                System.out.println("Fail to rename " + entry.getKey() + " to " + entry.getValue());
             }
         }
-         */
+
+        // Do a full copy to avoid checksum failure of MapDB
+        DocumentStore oldStore = MapdbDocStore.createOrOpen(getDocumentStorePathString(oldSegNum));
+        DocumentStore newStore = MapdbDocStore.createOrOpen(getDocumentStorePathString(newSegNum));
+        for (Iterator<Map.Entry<Integer, Document>> iter = oldStore.iterator(); iter.hasNext();) {
+            Map.Entry<Integer, Document> entry = iter.next();
+            newStore.addDocument(entry.getKey(), entry.getValue());
+        }
+        oldStore.close();
+        newStore.close();
+
+        File file = new File(getDocumentStorePathString(oldSegNum));
+        if ( file.delete() ) {
+            System.out.println("Deleted " + getDocumentStorePathString(oldSegNum) + " successfully");
+        } else {
+            System.out.println("Failed to delete " + getDocumentStorePathString(oldSegNum));
+        }
+
+        return;
     }
 
     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
@@ -531,14 +549,18 @@ public class InvertedIndexManager {
         fileHeaderA.close();
         fileHeaderB.close();
         fileHeaderNew.close();
+
         fileSegmentA.close();
         fileSegmentB.close();
         fileSegmentNew.close();
 
+        documentStoreA.close();
+        documentStoreB.close();
+        documentStoreNew.close();
 
         deleteAllFiles(segNumA);
         deleteAllFiles(segNumB);
-        // ToDo: remove old files A and B, and rename temp file to new segment files
+        renameAllFiles(segNumTemp, segNumNew);
 
         return;
     }
