@@ -35,7 +35,7 @@ public class InvertedIndexManager {
      * <p>
      * In test cases, the default merge threshold could possibly be set to any number.
      */
-    public static int DEFAULT_MERGE_THRESHOLD = 8;
+    public static int DEFAULT_MERGE_THRESHOLD = 11;
 
     public static int PAGE_SIZE = 4096;
 
@@ -88,9 +88,7 @@ public class InvertedIndexManager {
         for (String token : tokens) {
             if (buffer.containsKey(token)) {
                 List<Integer> orders = buffer.get(token);
-                if (orders.get(orders.size() - 1).equals(record)) {
-                    break;
-                } else {
+                if (!orders.get(orders.size() - 1).equals(record)) {
                     orders.add(record);
                 }
             } else {
@@ -278,11 +276,11 @@ public class InvertedIndexManager {
             PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
             byte[] docs = new byte[length * 4];
             int pages;
-            if (length <= PAGE_SIZE - offset*4) {
+            if (length*4 <= PAGE_SIZE - offset*4) {
                 pages = 1;
             } else {
-                int extraPages = (length - (PAGE_SIZE - offset*4)) / PAGE_SIZE;
-                int pos = (length - (PAGE_SIZE - offset*4)) % PAGE_SIZE;
+                int extraPages = (length*4 - (PAGE_SIZE - offset*4)) / PAGE_SIZE;
+                int pos = (length*4 - (PAGE_SIZE - offset*4)) % PAGE_SIZE;
                 if (pos == 0) {
                     pages = extraPages + 1;
                 } else {
@@ -324,22 +322,54 @@ public class InvertedIndexManager {
      */
     public Iterator<Document> searchAndQuery(List<String> keywords) {
         Preconditions.checkNotNull(keywords);
+        if (keywords.equals(Arrays.asList(""))){
+            return Collections.emptyIterator();
+        }
         List<Document> results = new ArrayList<>();
         for (int i = 0; i < getNumSegments(); i++) {
-            Map<String, List<Integer>> invertedLists = getIndexSegment(i).getInvertedLists();
-            List<String> keys = new ArrayList<>(invertedLists.keySet());
-            String docStorePath = "./docs" + i + ".db";
-            DocumentStore documentStore = MapdbDocStore.createOrOpen(docStorePath);
-            List<List<Integer>> listsOfWords = new ArrayList<>();
+            Map<String, List<Integer>> header = new TreeMap<>();
+            String path = indexFolder + "/header" + i + ".txt";
+            Path filePath = Paths.get(path);
+            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
+            ByteBuffer btf = pageFileChannel.readAllPages();
+            pageFileChannel.close();
+            btf.flip();
+            while (btf.hasRemaining()) {
+                int wordLength = btf.getInt();
+                if (wordLength == 0)
+                    break;
+                byte[] dst = new byte[wordLength];
+                btf.get(dst, 0, wordLength);
+                String key = new String(dst);
+                int pageID = btf.getInt();
+                int offset = btf.getInt();
+                int length = btf.getInt();
+                List<Integer> paras = Arrays.asList(pageID, offset, length);
+                header.put(key, paras);
+                }
+            btf.clear();
+            List<String> keys = new ArrayList<>(header.keySet());
+            List<Set<Integer>> listOfWords = new ArrayList<>();
+            int mid = -1, low = 0, high = keys.size() - 1;
+            String lastWord = ""; Boolean flag = false;
             for (String keyword : keywords) {
                 keyword = analyzer.analyze(keyword).get(0);
-                int low = 0, high = keys.size() - 1;
+                if (keyword.compareTo(lastWord) > 0){
+                    low = mid + 1;
+                }
+                else {
+                    high = mid - 1;
+                }
                 while (low <= high) {
-                    int mid = (low + high) / 2;
+                    mid = (low + high) / 2;
                     String key = keys.get(mid);
                     if (keyword.equals(key)) {
-                        List<Integer> docIDs = invertedLists.get(key);
-                        listsOfWords.add(docIDs);
+                        flag = true;
+                        lastWord = key;
+                        low = 0; high = keys.size() - 1;
+                        List<Integer> nums = header.get(key);
+                        Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
+                        listOfWords.add(docIDs);
                         break;
                     } else if (keyword.compareTo(key) > 0) {
                         low = mid + 1;
@@ -347,19 +377,73 @@ public class InvertedIndexManager {
                         high = mid - 1;
                     }
                 }
+                if (!flag){
+                    break;
+                }
+                else {
+                    flag = false;
+                }
             }
-            for (int j = 1; j < listsOfWords.size(); j++) {
-                listsOfWords.get(0).retainAll(listsOfWords.get(j));
+            if (keywords.size() > listOfWords.size()){
+                break;
             }
-            for (Integer integer : listsOfWords.get(0)) {
-                results.add(documentStore.getDocument(integer));
+            Set<Integer> mix = new HashSet<>();
+            Set<Integer> word1 = listOfWords.get(0);
+            for (int j = 1; j < listOfWords.size(); j++){
+                for (Integer ir : listOfWords.get(j)){
+                    if (word1.contains(ir)){
+                        mix.add(ir);
+                    }
+                }
+                word1.clear();
+                word1.addAll(mix);
+                mix.clear();
             }
-            documentStore.close();
+            String docStorePath1 = indexFolder + "/docs" + i + ".db";
+            DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
+            for (Integer e : word1){
+                results.add(documentStore1.getDocument(e));
+            }
+            documentStore1.close();
         }
         return results.iterator();
         // throw new UnsupportedOperationException();
     }
 
+    public Set<Integer> getIDs(int i, int pageID, int offset, int length){
+        String path1 = indexFolder + "/segment" + i + ".txt";
+        Path filePath1 = Paths.get(path1);
+        PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
+        byte[] docs = new byte[length * 4];
+        int pages;
+        if (length*4 <= PAGE_SIZE - offset*4) {
+            pages = 1;
+        } else {
+            int extraPages = (length*4 - (PAGE_SIZE - offset*4)) / PAGE_SIZE;
+            int pos = (length*4 - (PAGE_SIZE - offset*4)) % PAGE_SIZE;
+            if (pos == 0) {
+                pages = extraPages + 1;
+            } else {
+                pages = extraPages + 2;
+            }
+        }
+        ByteBuffer buf = ByteBuffer.allocate(pages * PAGE_SIZE);
+        for (int j = 0; j < pages; j++) {
+            buf.put(pageFileChannel1.readPage(pageID + j));
+        }
+        buf.position(offset * 4);
+        buf.get(docs, 0, length * 4);
+        ByteBuffer dor = ByteBuffer.allocate(length * 4);
+        dor.put(docs);
+        dor.flip();
+        Set<Integer> docIDs = new HashSet<>();
+        while (dor.hasRemaining()) {
+            int docID = dor.getInt();
+            docIDs.add(docID);
+        }
+        pageFileChannel1.close();
+        return docIDs;
+    }
     /**
      * Performs an OR boolean search on the inverted index.
      *
@@ -368,22 +452,54 @@ public class InvertedIndexManager {
      */
     public Iterator<Document> searchOrQuery(List<String> keywords) {
         Preconditions.checkNotNull(keywords);
+        if (keywords.equals(Arrays.asList(""))){
+            return Collections.emptyIterator();
+        }
         List<Document> results = new ArrayList<>();
         for (int i = 0; i < getNumSegments(); i++) {
-            Map<String, List<Integer>> invertedLists = getIndexSegment(i).getInvertedLists();
-            List<String> keys = new ArrayList<>(invertedLists.keySet());
-            String docStorePath = "./docs" + i + ".db";
-            DocumentStore documentStore = MapdbDocStore.createOrOpen(docStorePath);
-            List<List<Integer>> listsOfWords = new ArrayList<>();
+            Map<String, List<Integer>> header = new TreeMap<>();
+            String path = indexFolder + "/header" + i + ".txt";
+            Path filePath = Paths.get(path);
+            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
+            ByteBuffer btf = pageFileChannel.readAllPages();
+            pageFileChannel.close();
+            btf.flip();
+            while (btf.hasRemaining()) {
+                int wordLength = btf.getInt();
+                if (wordLength == 0)
+                    break;
+                byte[] dst = new byte[wordLength];
+                btf.get(dst, 0, wordLength);
+                String key = new String(dst);
+                int pageID = btf.getInt();
+                int offset = btf.getInt();
+                int length = btf.getInt();
+                List<Integer> paras = Arrays.asList(pageID, offset, length);
+                header.put(key, paras);
+            }
+            btf.clear();
+            List<String> keys = new ArrayList<>(header.keySet());
+            List<Set<Integer>> listOfWords = new ArrayList<>();
+            int mid = -1, low = 0, high = keys.size() - 1;
+            String lastWord = "";
+            Boolean flag = false;
             for (String keyword : keywords) {
                 keyword = analyzer.analyze(keyword).get(0);
-                int low = 0, high = keys.size() - 1;
+                if (keyword.compareTo(lastWord) > 0){
+                    low = mid + 1;
+                }
+                else {
+                    high = mid - 1;
+                }
                 while (low <= high) {
-                    int mid = (low + high) / 2;
+                    mid = (low + high) / 2;
                     String key = keys.get(mid);
                     if (keyword.equals(key)) {
-                        List<Integer> docIDs = invertedLists.get(key);
-                        listsOfWords.add(docIDs);
+                        lastWord = key;
+                        flag = true;
+                        List<Integer> nums = header.get(key);
+                        Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
+                        listOfWords.add(docIDs);
                         break;
                     } else if (keyword.compareTo(key) > 0) {
                         low = mid + 1;
@@ -391,15 +507,26 @@ public class InvertedIndexManager {
                         high = mid - 1;
                     }
                 }
+                if (flag) {
+                    low = 0;
+                    high = keys.size() - 1;
+                }
+                else {
+                    low = 0;
+                    high = keys.size() - 1;
+                    lastWord = "";
+                }
             }
-            for (int j = 1; j < listsOfWords.size(); j++) {
-                listsOfWords.get(j).removeAll(listsOfWords.get(0));
-                listsOfWords.get(0).addAll(listsOfWords.get(j));
+            Set<Integer> union = new HashSet<>();
+            for (Set<Integer> ir : listOfWords){
+                union.addAll(ir);
+                }
+            String docStorePath1 = indexFolder + "/docs" + i + ".db";
+            DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
+            for (Integer e : union){
+                results.add(documentStore1.getDocument(e));
             }
-            for (Integer integer : listsOfWords.get(0)) {
-                results.add(documentStore.getDocument(integer));
-            }
-            documentStore.close();
+            documentStore1.close();
         }
         return results.iterator();
         // throw new UnsupportedOperationException();
