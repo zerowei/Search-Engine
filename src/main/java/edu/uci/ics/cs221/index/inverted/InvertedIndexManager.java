@@ -320,6 +320,10 @@ public class InvertedIndexManager {
         }
 
         @Override public HeaderFileRow next() {
+            if (hasNext() == false) {
+                return null;
+            }
+
             HeaderFileRow row = new HeaderFileRow();
             row.lenWords = buffer.getInt();
             loadNextPageIfNecessary();
@@ -385,6 +389,8 @@ public class InvertedIndexManager {
     }
 
     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
+        System.out.println("------- merging " + segNumA + " and " + segNumB);
+
         int offsetHeaderFileA = 0, offsetHeaderFileB = 0;
         int offsetSegmentFileA = 0, offsetSegmentFileB = 0;
         int numDocumentA = 0;
@@ -420,7 +426,7 @@ public class InvertedIndexManager {
             documentStoreNew.addDocument((int) (docEntry.getKey() + documentStoreA.size()), docEntry.getValue());
         }
 
-        HeaderFileRow rowA = new HeaderFileRow(), rowB = new HeaderFileRow();
+        HeaderFileRow rowA = null, rowB = null;
         if (headerFileRowIteratorA.hasNext()) {
             rowA = headerFileRowIteratorA.next();
         }
@@ -429,11 +435,11 @@ public class InvertedIndexManager {
         }
         int newPageId = 0, newOffset = 0;
 
-        while (headerFileRowIteratorA.hasNext() && headerFileRowIteratorB.hasNext()) {
+        while (headerFileRowIteratorA.hasNext() || headerFileRowIteratorB.hasNext()) {
 
             HeaderFileRow rowNew = new HeaderFileRow();
 
-            if (rowA.keyword.compareTo(rowB.keyword) == 0) {
+            if (rowA != null && rowB != null && rowA.keyword.compareTo(rowB.keyword) == 0) {
                 rowNew.keyword = rowA.keyword;
                 rowNew.occurrenceList = new ArrayList<>(rowA.occurrenceList.size() + rowB.occurrenceList.size());
                 rowNew.occurrenceList.addAll(rowA.occurrenceList);
@@ -443,17 +449,27 @@ public class InvertedIndexManager {
                     rowNew.occurrenceList.add(new Integer((int) (occur + documentStoreA.size())));
                 }
 
-                System.out.println();
-                System.out.println("row A \t" + rowA.toString());
+                System.out.println("\nrow A \t" + rowA.toString());
                 System.out.println("row B \t" + rowB.toString());
-                System.out.println("new row\t" + rowNew.toString());
 
                 rowA = headerFileRowIteratorA.next();
                 rowB = headerFileRowIteratorB.next();
-            } else if (rowA.keyword.compareTo(rowB.keyword) > 0) {
 
-            } else if (rowA.keyword.compareTo(rowB.keyword) < 0) {
+            } else if (rowB == null || rowA.keyword.compareTo(rowB.keyword) < 0) {
+                rowNew = rowA;
 
+                System.out.println("\nrow A \t" + rowA.toString());
+
+                rowA = headerFileRowIteratorA.next();
+            } else if (rowA == null || rowA.keyword.compareTo(rowB.keyword) > 0) {
+                rowNew = rowB;
+                for (int i = 0; i < rowNew.occurrenceList.size(); i++) {
+                    rowNew.occurrenceList.set(i, (int) (rowNew.occurrenceList.get(i) + documentStoreA.size()));
+                }
+
+                System.out.println("\nrow B \t" + rowB.toString());
+
+                rowB = headerFileRowIteratorB.next();
             }
 
             rowNew.pageId = newPageId;
@@ -463,14 +479,8 @@ public class InvertedIndexManager {
 
             newPageId = newPageId + (newOffset + rowNew.numOccurrence * 4) / PAGE_SIZE;
             newOffset = (newOffset + rowNew.numOccurrence * 4) % PAGE_SIZE;
-        }
 
-        while (headerFileRowIteratorA.hasNext()) {
-
-        }
-
-        while (headerFileRowIteratorB.hasNext()) {
-
+            System.out.println("new row\t" + rowNew.toString());
         }
 
         bufferHeaderFileNew.flush();
