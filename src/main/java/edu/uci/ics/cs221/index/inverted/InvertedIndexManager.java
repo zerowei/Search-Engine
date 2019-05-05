@@ -129,11 +129,11 @@ public class InvertedIndexManager {
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(docStorePath, itr);
         documentStore.close();
-        String path = getHeaderFilePathString(numSegments);
-        String path1 = getSegmentFilePathString(numSegments);
+        String headerFilePathString = getHeaderFilePathString(numSegments);
+        String segmentFilePathString = getSegmentFilePathString(numSegments);
         int len = 0;
         numSegments += 1;
-        Path filePath = Paths.get(path);
+        Path filePath = Paths.get(headerFilePathString);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
 
         for (String obj : buffer.keySet()) {
@@ -166,25 +166,26 @@ public class InvertedIndexManager {
         buf.clear();
         pageFileChannel.close();
 
-        Path filePath1 = Paths.get(path1);
-        PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
-        int numOfInts = 0;
-        for (List<Integer> appears : buffer.values()) {
-            numOfInts += appears.size();
+        PageFileChannel segmentFileChannel = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
+        int totalNumAllOccurrence = 0;
+        for (List<Integer> occurrences : buffer.values()) {
+            totalNumAllOccurrence += occurrences.size();
         }
 
-        ByteBuffer byteBuffer = ByteBuffer.allocate(numOfInts * 4);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(totalNumAllOccurrence * 4);
         for (List<Integer> appears : buffer.values()) {
             for (Integer i : appears) {
                 byteBuffer.putInt(i);
             }
         }
-        pageFileChannel1.appendAllBytes(byteBuffer);
+        segmentFileChannel.appendAllBytes(byteBuffer);
         byteBuffer.clear();
-        pageFileChannel1.close();
+        segmentFileChannel.close();
+
         if (numSegments == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
             mergeAllSegments();
         }
+
         numStores += 1;
         record = 0;
         buffer.clear();
@@ -199,7 +200,7 @@ public class InvertedIndexManager {
         System.out.println(s);
          */
         /*
-        PageFileChannel pagefile1 = PageFileChannel.createOrOpen(filePath1);
+        PageFileChannel pagefile1 = PageFileChannel.createOrOpen(segmentFilePath);
         ByteBuffer btf = pagefile1.readAllPages();
         btf.position(12);
         System.out.println(btf.getInt());
