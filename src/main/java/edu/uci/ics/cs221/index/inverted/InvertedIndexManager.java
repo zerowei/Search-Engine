@@ -244,7 +244,9 @@ public class InvertedIndexManager {
         ByteBuffer getHeaderRowByteBuffer() {
             ByteBuffer result = ByteBuffer.allocate(keyword.getBytes().length + 4*4);
 
-            result.putInt(keyword.length());
+            // Note that keyword.getBytes().length can be larger than keyword.length()
+            // because some characters are not ASCII but UTF-8 and take more than 1 char
+            result.putInt(keyword.getBytes().length);
             result.put(keyword.getBytes());
             result.putInt(pageId);
             result.putInt(offset);
