@@ -153,6 +153,7 @@ public class InvertedIndexManager {
 
             int numOccurrence = buffer.get(word).size();
             buf.putInt(pageId).putInt(offset).putInt(numOccurrence);
+            // ToDo: fix the offset part in the getIndexSegement()
             int lenOccurInBytes = numOccurrence * 4;
             if (lenOccurInBytes < PAGE_SIZE - offset) {
                 offset += lenOccurInBytes;
