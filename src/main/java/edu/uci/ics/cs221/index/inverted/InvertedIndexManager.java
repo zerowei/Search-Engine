@@ -243,7 +243,7 @@ public class InvertedIndexManager {
         }
 
         ByteBuffer getHeaderRowByteBuffer() {
-            ByteBuffer result = ByteBuffer.allocate(keyword.length() + 4*4);
+            ByteBuffer result = ByteBuffer.allocate(keyword.getBytes().length + 4*4);
 
             result.putInt(keyword.length());
             result.put(keyword.getBytes());
