@@ -124,7 +124,7 @@ public class InvertedIndexManager {
         if (buffer.isEmpty() && documents.isEmpty()) {
             return;
         }
-        System.out.println(buffer);
+        //System.out.println(buffer);
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(getDocumentStorePathString(numSegments), itr);
         documentStore.close();
@@ -144,15 +144,15 @@ public class InvertedIndexManager {
 
         for (String word : buffer.keySet()) {
             byte[] bytes = word.getBytes();
-            System.out.println(new String(bytes));
+            //System.out.println(new String(bytes));
             buf.putInt(bytes.length);
             buf.put(bytes);
             int numOccurrence = buffer.get(word).size();
-            System.out.println(word);
-            System.out.println(word.length());
-            System.out.println(pageId);
-            System.out.println(offset);
-            System.out.println(numOccurrence);
+            //System.out.println(word);
+            //System.out.println(word.length());
+            //System.out.println(pageId);
+            //System.out.println(offset);
+            //System.out.println(numOccurrence);
             buf.putInt(pageId).putInt(offset).putInt(numOccurrence);
             // ToDo: fix the offset part in the getIndexSegement()
             int lenOccurInBytes = numOccurrence * 4;
@@ -293,11 +293,13 @@ public class InvertedIndexManager {
 
         // We can add a wrapper to buffer such as AutoFlushBuffer to avoid calling loadNextPageIfNecessary() multiple times
         private void loadNextPageIfNecessary() {
+            System.out.println("buf pos " + buffer.position() + " cap " + buffer.capacity());
             if (buffer.position() >= buffer.capacity()) {
                 buffer.clear();
                 pageNum++;
 
                 if (pageNum < file.getNumPages()) {
+                    System.out.println("loading page " + pageNum);
                     buffer = file.readPage(pageNum);
                 }
             }
@@ -365,10 +367,10 @@ public class InvertedIndexManager {
         }
 
         AutoFlushBuffer put(ByteBuffer bytes) {
-            System.out.println("putting " + bytes.toString());
+            //System.out.println("putting " + bytes.toString());
             bytes.rewind();
             buffer.put(bytes);
-            System.out.println("after putting " + buffer.toString());
+            //System.out.println("after putting " + buffer.toString());
 
             if (buffer.position() > PAGE_SIZE) {
                 flush();
@@ -403,9 +405,9 @@ public class InvertedIndexManager {
         for (String name: fileNamesToDelete) {
             File file = new File(name);
             if ( file.delete() ) {
-                System.out.println("Deleted " + name + " successfully");
+                //System.out.println("Deleted " + name + " successfully");
             } else {
-                System.out.println("Failed to delete " + name);
+                //System.out.println("Failed to delete " + name);
             }
         }
 
@@ -421,9 +423,9 @@ public class InvertedIndexManager {
         for (Map.Entry<String,String> entry : fileNamesToRename.entrySet()) {
             File file = new File(entry.getKey());
             if ( file.renameTo(new File(entry.getValue()))) {
-                System.out.println("Rename " + entry.getKey() + " to " + entry.getValue() + " successfully");
+                //System.out.println("Rename " + entry.getKey() + " to " + entry.getValue() + " successfully");
             } else {
-                System.out.println("Fail to rename " + entry.getKey() + " to " + entry.getValue());
+                //System.out.println("Fail to rename " + entry.getKey() + " to " + entry.getValue());
             }
         }
 
@@ -439,9 +441,9 @@ public class InvertedIndexManager {
 
         File file = new File(getDocumentStorePathString(oldSegNum));
         if ( file.delete() ) {
-            System.out.println("Deleted " + getDocumentStorePathString(oldSegNum) + " successfully");
+            //System.out.println("Deleted " + getDocumentStorePathString(oldSegNum) + " successfully");
         } else {
-            System.out.println("Failed to delete " + getDocumentStorePathString(oldSegNum));
+            //System.out.println("Failed to delete " + getDocumentStorePathString(oldSegNum));
         }
 
         return;
@@ -615,10 +617,10 @@ public class InvertedIndexManager {
                     break;
                 }
             }
-            System.out.println(key);
-            System.out.println(pageID);
-            System.out.println(offset);
-            System.out.println(length);
+            //System.out.println(key);
+            //System.out.println(pageID);
+            //System.out.println(offset);
+            //System.out.println(length);
             if (!key.equals(keyword)){
                 return Collections.emptyIterator();
             }
@@ -651,7 +653,7 @@ public class InvertedIndexManager {
             List<Integer> docIDs = new ArrayList<>();
             while (dor.hasRemaining()) {
                 int docID = dor.getInt();
-                System.out.println(docID);
+                //System.out.println(docID);
                 docIDs.add(docID);
             }
             String docStorePath1 = getDocumentStorePathString(i);
@@ -830,7 +832,7 @@ public class InvertedIndexManager {
                 List<Integer> paras = Arrays.asList(pageID, offset, length);
                 header.put(key, paras);
             }
-            System.out.println(header);
+            //System.out.println(header);
             btf.clear();
             List<String> keys = new ArrayList<>(header.keySet());
             List<Set<Integer>> listOfWords = new ArrayList<>();
@@ -854,7 +856,7 @@ public class InvertedIndexManager {
                         List<Integer> nums = header.get(key);
                         Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
                         listOfWords.add(docIDs);
-                        System.out.println(listOfWords);
+                        //System.out.println(listOfWords);
                         break;
                     } else if (keyword.compareTo(key) > 0) {
                         low = mid + 1;
@@ -877,7 +879,7 @@ public class InvertedIndexManager {
             for (Set<Integer> ir : listOfWords){
                 union.addAll(ir);
                 }
-            System.out.println(union);
+            //System.out.println(union);
             String docStorePath1 = getDocumentStorePathString(i);
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
             for (Integer e : union){
@@ -993,23 +995,23 @@ public class InvertedIndexManager {
         Map<String, List<Integer>> invertedLists = new TreeMap<>();
         while (btf.hasRemaining()) {
             int wordLength = btf.getInt();
-            System.out.println(wordLength);
+            //System.out.println(wordLength);
             if (wordLength == 0)
                 break;
             byte[] dst = new byte[wordLength];
-            System.out.println(btf.position());
+            //System.out.println(btf.position());
             btf.get(dst, 0, wordLength);
-            System.out.println(btf.position());
+            //System.out.println(btf.position());
             String keyWord = new String(dst);
             int pageID = btf.getInt();
             int offset = btf.getInt();
             int length = btf.getInt();
-            System.out.println(keyWord);
+            //System.out.println(keyWord);
             byte[] docs = new byte[length * 4];
             int pages;
-            System.out.println(pageID);
-            System.out.println(offset);
-            System.out.println(length);
+            //System.out.println(pageID);
+            //System.out.println(offset);
+            //System.out.println(length);
             if (length*4 <= PAGE_SIZE - offset) {
                 pages = 1;
             } else {
@@ -1021,7 +1023,7 @@ public class InvertedIndexManager {
                     pages = extraPages + 2;
                 }
             }
-            System.out.println(pages);
+            //System.out.println(pages);
             ByteBuffer buf = ByteBuffer.allocate(pages * PAGE_SIZE);
             for (int i = 0; i < pages; i++) {
                 buf.put(pageFileChannel1.readPage(pageID + i));
@@ -1038,7 +1040,7 @@ public class InvertedIndexManager {
             }
             invertedLists.put(keyWord, docIDs);
         }
-        System.out.println(invertedLists);
+        //System.out.println(invertedLists);
         pageFileChannel.close();
         pageFileChannel1.close();
 
