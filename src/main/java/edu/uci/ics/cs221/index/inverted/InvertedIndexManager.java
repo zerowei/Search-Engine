@@ -121,7 +121,7 @@ public class InvertedIndexManager {
      * flush() writes the segment to disk containing the posting list and the corresponding document store.
      */
     public void flush() {
-        if (buffer.isEmpty()) {
+        if (buffer.isEmpty() && documents.isEmpty()) {
             return;
         }
         System.out.println(buffer);
@@ -145,7 +145,6 @@ public class InvertedIndexManager {
         for (String word : buffer.keySet()) {
             byte[] bytes = word.getBytes();
             System.out.println(new String(bytes));
-
             buf.putInt(bytes.length);
             buf.put(bytes);
             int numOccurrence = buffer.get(word).size();
