@@ -7,6 +7,7 @@ import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -393,6 +394,42 @@ public class InvertedIndexManager {
         return result;
     }
 
+    private void deleteAllFiles(int segNum) {
+        List<String> fileNamesToDelete = Arrays.asList(
+                getHeaderFilePathString(segNum),
+                getSegmentFilePathString(segNum),
+                getDocumentStorePathString(segNum)
+        );
+
+        for (String name: fileNamesToDelete) {
+            File file = new File(name);
+            if ( file.delete() ) {
+                System.out.println("Deleted " + name + " successfully");
+            } else {
+                System.out.println("Failed to delete " + name);
+            }
+        }
+    }
+
+    private void renameAllFiles(int oldSegNum, int newSegNum) {
+        /*
+        List<String> fileNamesToDelete = Arrays.asList(
+                getHeaderFilePathString(segNum),
+                getSegmentFilePathString(segNum),
+                getDocumentStorePathString(segNum)
+        );
+
+        for (String name: fileNamesToDelete) {
+            File file = new File(name);
+            if ( file.delete() ) {
+                System.out.println("Deleted " + name + " successfully");
+            } else {
+                System.out.println("Failed to delete " + name);
+            }
+        }
+         */
+    }
+
     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
         System.out.println("------- merging " + segNumA + " and " + segNumB);
 
@@ -440,7 +477,7 @@ public class InvertedIndexManager {
         }
         int newPageId = 0, newOffset = 0;
 
-        while (headerFileRowIteratorA.hasNext() || headerFileRowIteratorB.hasNext()) {
+        while (rowA != null || rowB != null) {
 
             HeaderFileRow rowNew = new HeaderFileRow();
 
@@ -460,13 +497,13 @@ public class InvertedIndexManager {
                 rowA = headerFileRowIteratorA.next();
                 rowB = headerFileRowIteratorB.next();
 
-            } else if (rowB == null || rowA.keyword.compareTo(rowB.keyword) < 0) {
+            } else if ( rowA != null && (rowB == null || rowA.keyword.compareTo(rowB.keyword) < 0) ) {
                 rowNew = rowA;
 
                 System.out.println("\nrow A \t" + rowA.toString());
 
                 rowA = headerFileRowIteratorA.next();
-            } else if (rowA == null || rowA.keyword.compareTo(rowB.keyword) > 0) {
+            } else if (rowB != null && (rowA == null || rowA.keyword.compareTo(rowB.keyword) > 0)) {
                 rowNew = rowB;
                 for (int i = 0; i < rowNew.occurrenceList.size(); i++) {
                     rowNew.occurrenceList.set(i, (int) (rowNew.occurrenceList.get(i) + documentStoreA.size()));
@@ -498,6 +535,9 @@ public class InvertedIndexManager {
         fileSegmentB.close();
         fileSegmentNew.close();
 
+
+        deleteAllFiles(segNumA);
+        deleteAllFiles(segNumB);
         // ToDo: remove old files A and B, and rename temp file to new segment files
 
         return;
@@ -898,18 +938,20 @@ public class InvertedIndexManager {
      * @return in-memory data structure with all contents in the index segment, null if segmentNum don't exist.
      */
     public InvertedIndexSegmentForTest getIndexSegment(int segmentNum) {
-        if (segmentNum >= numSegments) {
+
+        if (segmentNum >= numSegments)
             return null;
-        }
-        String docStorePath1 = getDocumentStorePathString(segmentNum);
-        DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
+
+        DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segmentNum));
         Iterator<Integer> itr = documentStore.keyIterator();
         Map<Integer, Document> documents = new HashMap<>();
+
         while (itr.hasNext()) {
             Integer inte = itr.next();
             Document doc = documentStore.getDocument(inte);
             documents.put(inte, doc);
         }
+
         documentStore.close();
         String path = getHeaderFilePathString(segmentNum);
         Path filePath = Paths.get(path);
