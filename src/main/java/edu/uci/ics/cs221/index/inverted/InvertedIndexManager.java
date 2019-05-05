@@ -5,6 +5,7 @@ import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
+import sun.jvm.hotspot.memory.HeapBlock;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.IOException;
@@ -205,12 +206,24 @@ public class InvertedIndexManager {
         //throw new UnsupportedOperationException();
     }
 
+
+    private HeaderFileRow decodeHeaderFileRow(byte[] bytes) {
+        throw new NotImplementedException();
+        //return new HeaderFileRow();
+    }
+
+    private byte[] eecodeHeaderFileRow(HeaderFileRow row) {
+        throw new NotImplementedException();
+        //return new HeaderFileRow();
+    }
+
     class HeaderFileRow {
         int lenWords;
         byte[] bytes;
         int pageId;
         int offset;
         int numOccurrence;
+        List<Integer> occurrenceList;
         String keyword;
 
         @Override
@@ -219,19 +232,20 @@ public class InvertedIndexManager {
                     + "\tpageId: " + pageId
                     + "\toffset: " + offset
                     + "\tnumOcc " + numOccurrence
-                    + "\n";
+                    + "\t occu " + occurrenceList.toString();
         }
     }
 
+
     // Since the underlying file is based on pages, we need such an iterator to make life easier
     class HeaderFileRowIterator implements Iterator<HeaderFileRow> {
-        PageFileChannel file;
+        PageFileChannel file, segmentFile;
         ByteBuffer buffer;
         int pageNum, offset;
-        int nextWordLength;
 
-        HeaderFileRowIterator(PageFileChannel file) {
+        HeaderFileRowIterator(PageFileChannel file, PageFileChannel segmentFile) {
             this.file = file;
+            this.segmentFile = segmentFile;
             buffer = null;
 
             offset = 0;
@@ -256,6 +270,7 @@ public class InvertedIndexManager {
             return false;
         }
 
+        // We can add a wrapper to buffer such as AutoFlushBuffer to avoid calling loadNextPageIfNecessary() multiple times
         private void loadNextPageIfNecessary() {
             if (buffer.position() >= buffer.capacity()) {
                 buffer.clear();
@@ -266,6 +281,24 @@ public class InvertedIndexManager {
                 }
             }
 
+        }
+
+        // ToDo: cache the current page to avoid multiple read on the same page
+        private List<Integer> getSegmentList(int pageId, int offset, int numOccurrence) {
+            List<Integer> result = new ArrayList<>(numOccurrence);
+            int numPages = (int) Math.ceil((numOccurrence * 4 + offset + 0.0) / PAGE_SIZE);
+
+            ByteBuffer buffer = ByteBuffer.allocate(PAGE_SIZE * numPages);
+            for (int i = pageId; i < pageId + numPages; i++) {
+                buffer.put(segmentFile.readPage(i));
+            }
+
+            buffer.position(offset);
+            for (int i = 0; i < numOccurrence; i++) {
+                result.add(buffer.getInt());
+            }
+
+            return result;
         }
 
         @Override public HeaderFileRow next() {
@@ -287,21 +320,16 @@ public class InvertedIndexManager {
 
             row.keyword = new String(row.bytes);
 
-            System.out.println(row.toString());
+            row.occurrenceList = getSegmentList(row.pageId, row.offset, row.numOccurrence);
 
+
+            System.out.println(row.toString());
             return row;
         }
     }
 
     private void mergeDocumentStores(int docStoreNumA, int docStoreNumB, int docStoreNumNew) {
 
-    }
-
-    private void flushBufferIfNeeded(ByteBuffer buffer, PageFileChannel file) {
-        if (buffer.position() > PAGE_SIZE * 10) {
-            file.appendAllBytes(buffer);
-            buffer.clear();
-        }
     }
 
     class AutoFlushBuffer {
@@ -344,8 +372,8 @@ public class InvertedIndexManager {
         PageFileChannel fileSegmentB      = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumB)));
         PageFileChannel fileSegmentNew    = PageFileChannel.createOrOpen(Paths.get(getSegmentFilePathString(segNumNew)));
 
-        HeaderFileRowIterator headerFileRowIteratorA = new HeaderFileRowIterator(fileHeaderA);
-        HeaderFileRowIterator headerFileRowIteratorB = new HeaderFileRowIterator(fileHeaderB);
+        HeaderFileRowIterator headerFileRowIteratorA = new HeaderFileRowIterator(fileHeaderA, fileSegmentA);
+        HeaderFileRowIterator headerFileRowIteratorB = new HeaderFileRowIterator(fileHeaderB, fileSegmentB);
 
         AutoFlushBuffer bufferHeaderFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileHeaderNew);
         AutoFlushBuffer bufferSegmentFileNew = new AutoFlushBuffer(ByteBuffer.allocate(PAGE_SIZE * 16), fileSegmentNew);
@@ -353,6 +381,9 @@ public class InvertedIndexManager {
         while (headerFileRowIteratorA.hasNext() && headerFileRowIteratorB.hasNext()) {
             HeaderFileRow rowA = headerFileRowIteratorA.next();
             HeaderFileRow rowB = headerFileRowIteratorB.next();
+
+            System.out.println("row A keyword " + rowA.keyword);
+            System.out.println("row B keyword " + rowB.keyword);
 
             if (rowA.keyword.compareTo(rowB.keyword) == 0) {
 
