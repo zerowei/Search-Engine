@@ -208,10 +208,21 @@ public class InvertedIndexManager {
     }
 
     class HeaderFileRow {
-        String keyword;
+        int lenWords;
+        byte[] bytes;
         int pageId;
         int offset;
         int numOccurrence;
+        String keyword;
+
+        @Override
+        public String toString() {
+            return "keyword: " + keyword
+                    + "\tpageId: " + pageId
+                    + "\toffset: " + offset
+                    + "\tnumOcc " + numOccurrence
+                    + "\n";
+        }
     }
 
     // Since the underlying file is based on pages, we need such an iterator to make life easier
@@ -219,20 +230,68 @@ public class InvertedIndexManager {
         PageFileChannel file;
         ByteBuffer buffer;
         int pageNum, offset;
+        int nextWordLength;
 
         HeaderFileRowIterator(PageFileChannel file) {
             this.file = file;
-            buffer = ByteBuffer.allocate(PAGE_SIZE);
+            buffer = null;
+
             offset = 0;
             pageNum = 0;
+            if (pageNum < file.getNumPages()) {
+                buffer = file.readPage(pageNum);
+            }
         }
 
         @Override public boolean hasNext() {
-            throw new NotImplementedException();
+            if (pageNum >= file.getNumPages()) {
+                return false;
+            }
+
+            int nextLenWord = buffer.getInt();
+            buffer.position(buffer.position()-4);
+
+            if (nextLenWord > 0) {
+                return true;
+            }
+
+            return false;
+        }
+
+        private void loadNextPageIfNecessary() {
+            if (buffer.position() >= buffer.capacity()) {
+                buffer.clear();
+                pageNum++;
+
+                if (pageNum < file.getNumPages()) {
+                    buffer = file.readPage(pageNum);
+                }
+            }
+
         }
 
         @Override public HeaderFileRow next() {
-            throw new NotImplementedException();
+            HeaderFileRow row = new HeaderFileRow();
+            row.lenWords = buffer.getInt();
+            loadNextPageIfNecessary();
+            row.bytes = new byte[row.lenWords];
+            loadNextPageIfNecessary();
+            for (int i = 0; i < row.lenWords; i++) {
+                buffer.get(row.bytes, i, 1);
+                loadNextPageIfNecessary();
+            }
+            row.pageId = buffer.getInt();
+            loadNextPageIfNecessary();
+            row.offset = buffer.getInt();
+            loadNextPageIfNecessary();
+            row.numOccurrence = buffer.getInt();
+            loadNextPageIfNecessary();
+
+            row.keyword = new String(row.bytes);
+
+            System.out.println(row.toString());
+
+            return row;
         }
     }
 
