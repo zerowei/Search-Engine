@@ -188,7 +188,6 @@ public class InvertedIndexManager {
             mergeAllSegments();
         }
 
-        numSegments += 1;
         record = 0;
         buffer.clear();
         documents.clear();
