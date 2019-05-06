@@ -519,12 +519,8 @@ public class InvertedIndexManager {
 
         DocumentStore documentStoreA = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segNumA));
         DocumentStore documentStoreB = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segNumB));
-        DocumentStore documentStoreNew = MapdbDocStore.createOrOpen(getDocumentStorePathString(segNumTemp));
 
-        for (Iterator<Map.Entry<Integer, Document>> it = documentStoreA.iterator(); it.hasNext();) {
-            Map.Entry<Integer, Document> docEntry = it.next();
-            documentStoreNew.addDocument(docEntry.getKey(), docEntry.getValue());
-        }
+        DocumentStore documentStoreNew = MapdbDocStore.createWithBulkLoad(getDocumentStorePathString(segNumTemp), documentStoreA.iterator());
         for (Iterator<Map.Entry<Integer, Document>> it = documentStoreB.iterator(); it.hasNext();) {
             Map.Entry<Integer, Document> docEntry = it.next();
             documentStoreNew.addDocument((int) (docEntry.getKey() + documentStoreA.size()), docEntry.getValue());
