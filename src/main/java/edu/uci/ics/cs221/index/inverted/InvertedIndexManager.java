@@ -478,11 +478,7 @@ public class InvertedIndexManager {
 
         // Do a full copy to avoid checksum failure of MapDB
         DocumentStore oldStore = MapdbDocStore.createOrOpen(getDocumentStorePathString(oldSegNum));
-        DocumentStore newStore = MapdbDocStore.createOrOpen(getDocumentStorePathString(newSegNum));
-        for (Iterator<Map.Entry<Integer, Document>> iter = oldStore.iterator(); iter.hasNext();) {
-            Map.Entry<Integer, Document> entry = iter.next();
-            newStore.addDocument(entry.getKey(), entry.getValue());
-        }
+        DocumentStore newStore = MapdbDocStore.createWithBulkLoad(getDocumentStorePathString(newSegNum), oldStore.iterator());
         oldStore.close();
         newStore.close();
 
