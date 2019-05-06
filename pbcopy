@@ -1,0 +1,56 @@
+diff --git a/src/main/java/edu/uci/ics/cs221/index/inverted/InvertedIndexManager.java b/src/main/java/edu/uci/ics/cs221/index/inverted/InvertedIndexManager.java
+index 97c1960..b624785 100644
+--- a/src/main/java/edu/uci/ics/cs221/index/inverted/InvertedIndexManager.java
++++ b/src/main/java/edu/uci/ics/cs221/index/inverted/InvertedIndexManager.java
+@@ -5,6 +5,7 @@ import edu.uci.ics.cs221.analysis.*;
+ import edu.uci.ics.cs221.storage.Document;
+ import edu.uci.ics.cs221.storage.DocumentStore;
+ import edu.uci.ics.cs221.storage.MapdbDocStore;
++import org.apache.lucene.index.MergeState;
+ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+ 
+ import java.io.File;
+@@ -492,6 +493,29 @@ public class InvertedIndexManager {
+         return;
+     }
+ 
++    class BulkLoadIterator implements Iterator<Map.Entry<Integer, Document>> {
++        Iterator<Map.Entry<Integer, Document>> iteratorA, iteratorB;
++        int numEntryA;
++
++        public BulkLoadIterator(Iterator<Map.Entry<Integer, Document>> iteratorA, Iterator<Map.Entry<Integer, Document>> iteratorB, int numEntryA) {
++            this.iteratorA = iteratorA;
++            this.iteratorB = iteratorB;
++            this.numEntryA = numEntryA;
++        }
++
++        @Override public boolean hasNext() {
++            return iteratorA.hasNext() && iteratorB.hasNext();
++        }
++
++        @Override public Map.Entry<Integer, Document> next() {
++            if (iteratorA.hasNext()) {
++                return iteratorA.next();
++            }
++            Map.Entry<Integer, Document> tempEntry = iteratorB.next();
++            return new AbstractMap.SimpleEntry<Integer, Document>(tempEntry.getKey() + numEntryA, tempEntry.getValue());
++        }
++    }
++
+     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
+         //System.out.println("------- merging " + segNumA + " and " + segNumB);
+ 
+@@ -520,11 +544,8 @@ public class InvertedIndexManager {
+         DocumentStore documentStoreA = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segNumA));
+         DocumentStore documentStoreB = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segNumB));
+ 
+-        DocumentStore documentStoreNew = MapdbDocStore.createWithBulkLoad(getDocumentStorePathString(segNumTemp), documentStoreA.iterator());
+-        for (Iterator<Map.Entry<Integer, Document>> it = documentStoreB.iterator(); it.hasNext();) {
+-            Map.Entry<Integer, Document> docEntry = it.next();
+-            documentStoreNew.addDocument((int) (docEntry.getKey() + documentStoreA.size()), docEntry.getValue());
+-        }
++        DocumentStore documentStoreNew = MapdbDocStore.createWithBulkLoad(getDocumentStorePathString(segNumTemp), new BulkLoadIterator(documentStoreA.iterator(), documentStoreB.iterator(),
++                (int) documentStoreA.size()));
+ 
+         HeaderFileRow rowA = null, rowB = null;
+         if (headerFileRowIteratorA.hasNext()) {
