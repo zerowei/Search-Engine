@@ -32,7 +32,7 @@ public class Team3StressTest {
     @Test(timeout = 600000)
     public void setupAndRun(){
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 5000;
-        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 24;
+        InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 12;
 
         allDocuments = getOnlineTextFile(textUrl);
         analyzer = new ComposableAnalyzer(new PunctuationTokenizer(),new PorterStemmer());

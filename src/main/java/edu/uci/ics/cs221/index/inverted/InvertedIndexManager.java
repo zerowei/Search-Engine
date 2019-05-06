@@ -37,7 +37,7 @@ public class InvertedIndexManager {
      * <p>
      * In test cases, the default merge threshold could possibly be set to any number.
      */
-    public static int DEFAULT_MERGE_THRESHOLD = 11;
+    public static int DEFAULT_MERGE_THRESHOLD = 8;
 
     public static int PAGE_SIZE = 4096;
 
@@ -645,7 +645,6 @@ public class InvertedIndexManager {
         for (int i = 0; i < getNumSegments(); i++) {
             String headerFilePathString = getHeaderFilePathString(i);
             PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(Paths.get(headerFilePathString));
-
             ByteBuffer btf = pageFileChannel.readAllPages();
             btf.flip();
             int pageID=0, offset=0, length=0;
