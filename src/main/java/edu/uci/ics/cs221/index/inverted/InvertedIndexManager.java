@@ -758,7 +758,7 @@ public class InvertedIndexManager {
                     Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
                     listOfWords.add(docIDs);
                 } else {
-                    listOfWords.add(Collections.EMPTY_SET);
+                    return Collections.emptyIterator();
                 }
             }
             if (listOfWords.size() == 0){
