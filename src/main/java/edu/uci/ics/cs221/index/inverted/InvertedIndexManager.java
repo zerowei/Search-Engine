@@ -589,7 +589,6 @@ public class InvertedIndexManager {
             newOffset = (newOffset + rowNew.numOccurrence * 4) % PAGE_SIZE;
 
             //System.out.println("new row\t" + rowNew.toString());
-            assert(rowNew.keyword != "ts");
         }
 
         bufferHeaderFileNew.flush();
