@@ -283,7 +283,7 @@ public class InvertedIndexManager {
                 pageId++;
 
                 if (pageId < file.getNumPages()) {
-                    System.out.println("loading page " + pageId + " \\ " + file.getNumPages());
+                    //System.out.println("loading page " + pageId + " \\ " + file.getNumPages());
                     buffer = file.readPage(pageId);
                 }
             }
@@ -307,14 +307,11 @@ public class InvertedIndexManager {
         boolean hasRemaining() {
             //System.out.println("hasRemaining pageId: " + pageId + " numpages " + file.getNumPages());
             if (pageId < file.getNumPages() - 1) {
-                //System.out.println("AAAAA");
                 return true;
             }
 
             if (pageId == file.getNumPages() - 1 && buffer.hasRemaining()) {
-                //System.out.println("BBBBB");
                 if (buffer.position() < buffer.capacity() - 4) {
-                    //System.out.println("CCCC");
                     int nextWordLength = buffer.getInt();
                     buffer.position(buffer.position() - 4);
                     return nextWordLength > 0;
@@ -348,7 +345,7 @@ public class InvertedIndexManager {
 
         // ToDo: cache the current page to avoid multiple read on the same page
         private List<Integer> getSegmentList(int pageId, int offset, int numOccurrence) {
-            System.out.println("get segment list; pageId: " + pageId + " offset: " + offset + " numOccu: " + numOccurrence);
+            //System.out.println("get segment list; pageId: " + pageId + " offset: " + offset + " numOccu: " + numOccurrence);
             List<Integer> result = new ArrayList<>(numOccurrence);
             int numPages = (int) Math.ceil((numOccurrence * 4 + offset + 0.0) / PAGE_SIZE);
 
@@ -500,7 +497,7 @@ public class InvertedIndexManager {
     }
 
     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
-        System.out.println("------- merging " + segNumA + " and " + segNumB);
+        //System.out.println("------- merging " + segNumA + " and " + segNumB);
 
         int offsetHeaderFileA = 0, offsetHeaderFileB = 0;
         int offsetSegmentFileA = 0, offsetSegmentFileB = 0;
@@ -560,8 +557,8 @@ public class InvertedIndexManager {
                     rowNew.occurrenceList.add(new Integer((int) (occur + documentStoreA.size())));
                 }
 
-                System.out.println("\nrow A \t" + rowA.toString());
-                System.out.println("row B \t" + rowB.toString());
+                //System.out.println("\nrow A \t" + rowA.toString());
+                //System.out.println("row B \t" + rowB.toString());
 
                 rowA = headerFileRowIteratorA.next();
                 rowB = headerFileRowIteratorB.next();
@@ -569,7 +566,7 @@ public class InvertedIndexManager {
             } else if ( rowA != null && (rowB == null || rowA.keyword.compareTo(rowB.keyword) < 0) ) {
                 rowNew = rowA;
 
-                System.out.println("\nrow A \t" + rowA.toString());
+                //System.out.println("\nrow A \t" + rowA.toString());
 
                 rowA = headerFileRowIteratorA.next();
             } else if (rowB != null && (rowA == null || rowA.keyword.compareTo(rowB.keyword) > 0)) {
@@ -578,7 +575,7 @@ public class InvertedIndexManager {
                     rowNew.occurrenceList.set(i, (int) (rowNew.occurrenceList.get(i) + documentStoreA.size()));
                 }
 
-                System.out.println("\nrow B \t" + rowB.toString());
+                //System.out.println("\nrow B \t" + rowB.toString());
 
                 rowB = headerFileRowIteratorB.next();
             }
@@ -591,7 +588,7 @@ public class InvertedIndexManager {
             newPageId = newPageId + (newOffset + rowNew.numOccurrence * 4) / PAGE_SIZE;
             newOffset = (newOffset + rowNew.numOccurrence * 4) % PAGE_SIZE;
 
-            System.out.println("new row\t" + rowNew.toString());
+            //System.out.println("new row\t" + rowNew.toString());
             assert(rowNew.keyword != "ts");
         }
 
@@ -677,7 +674,7 @@ public class InvertedIndexManager {
             }
 
             String segmentFilePathString = getSegmentFilePathString(i);
-            System.out.println(segmentFilePathString);
+            //System.out.println(segmentFilePathString);
             PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
             byte[] docs = new byte[length * 4];
             int pages;
@@ -1047,12 +1044,12 @@ public class InvertedIndexManager {
         while (btf.hasRemaining()) {
 
             int wordLength = btf.getInt();
-            System.out.println("wordLen " + wordLength);
+            //System.out.println("wordLen " + wordLength);
             if (wordLength == 0)
                 break;
 
             byte[] dst = new byte[wordLength];
-            System.out.println("pos " + btf.position() + " cap " + btf.capacity());
+            //System.out.println("pos " + btf.position() + " cap " + btf.capacity());
             btf.get(dst, 0, wordLength);
             //System.out.println(btf.position());
             String keyWord = new String(dst);
@@ -1060,7 +1057,7 @@ public class InvertedIndexManager {
             int pageID = btf.getInt();
             int offset = btf.getInt();
             int length = btf.getInt();
-            System.out.println("keyword " + keyWord + " pageId " + Integer.toHexString(pageID) + " offset " + Integer.toHexString(offset) + " len " + Integer.toHexString(length));
+            //System.out.println("keyword " + keyWord + " pageId " + Integer.toHexString(pageID) + " offset " + Integer.toHexString(offset) + " len " + Integer.toHexString(length));
 
             byte[] docs = new byte[length * 4];
             int pages;
