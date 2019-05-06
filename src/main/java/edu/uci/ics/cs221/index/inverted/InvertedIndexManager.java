@@ -1037,19 +1037,23 @@ public class InvertedIndexManager {
         btf.flip();
         Map<String, List<Integer>> invertedLists = new TreeMap<>();
         while (btf.hasRemaining()) {
+
             int wordLength = btf.getInt();
-            //System.out.println(wordLength);
+            System.out.println("wordLen " + wordLength);
             if (wordLength == 0)
                 break;
+
             byte[] dst = new byte[wordLength];
-            //System.out.println(btf.position());
+            System.out.println("pos " + btf.position() + " cap " + btf.capacity());
             btf.get(dst, 0, wordLength);
             //System.out.println(btf.position());
             String keyWord = new String(dst);
+
             int pageID = btf.getInt();
             int offset = btf.getInt();
             int length = btf.getInt();
-            //System.out.println(keyWord);
+            System.out.println("keyword " + keyWord + " pageId " + Integer.toHexString(pageID) + " offset " + Integer.toHexString(offset) + " len " + Integer.toHexString(length));
+
             byte[] docs = new byte[length * 4];
             int pages;
             //System.out.println(pageID);
