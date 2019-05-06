@@ -305,16 +305,16 @@ public class InvertedIndexManager {
         }
 
         boolean hasRemaining() {
-            System.out.println("hasRemaining pageId: " + pageId + " numpages " + file.getNumPages());
+            //System.out.println("hasRemaining pageId: " + pageId + " numpages " + file.getNumPages());
             if (pageId < file.getNumPages() - 1) {
-                System.out.println("AAAAA");
+                //System.out.println("AAAAA");
                 return true;
             }
 
             if (pageId == file.getNumPages() - 1 && buffer.hasRemaining()) {
-                System.out.println("BBBBB");
+                //System.out.println("BBBBB");
                 if (buffer.position() < buffer.capacity() - 4) {
-                    System.out.println("CCCC");
+                    //System.out.println("CCCC");
                     int nextWordLength = buffer.getInt();
                     buffer.position(buffer.position() - 4);
                     return nextWordLength > 0;
@@ -423,6 +423,13 @@ public class InvertedIndexManager {
         }
 
         AutoFlushBuffer flush() {
+            if (buffer.hasRemaining()) {
+                byte byteZero = 0;
+
+                while (buffer.hasRemaining()) {
+                    buffer.put(byteZero);
+                }
+            }
             file.appendAllBytes(buffer);
             buffer.clear();
             return this;
@@ -585,6 +592,7 @@ public class InvertedIndexManager {
             newOffset = (newOffset + rowNew.numOccurrence * 4) % PAGE_SIZE;
 
             System.out.println("new row\t" + rowNew.toString());
+            assert(rowNew.keyword != "ts");
         }
 
         bufferHeaderFileNew.flush();
