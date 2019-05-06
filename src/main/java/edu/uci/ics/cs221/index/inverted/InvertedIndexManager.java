@@ -230,6 +230,7 @@ public class InvertedIndexManager {
 
         @Override
         public String toString() {
+            assert keyword.isEmpty() == false;
             return "keyword: " + keyword
                     + "\tpageId: " + pageId
                     + "\toffset: " + offset
@@ -258,10 +259,77 @@ public class InvertedIndexManager {
     }
 
 
+    class AutoLoadBuffer {
+        ByteBuffer buffer;
+        int pageId;
+        PageFileChannel file;
+
+        AutoLoadBuffer(PageFileChannel file) {
+            pageId = 0;
+            this.file = file;
+
+            buffer = ByteBuffer.allocate(PAGE_SIZE);
+            if (pageId < file.getNumPages()) {
+                buffer = file.readPage(0);
+            }
+        }
+
+        byte getByte() {
+            byte[] result = new byte[1];
+            buffer.get(result);
+
+            if (buffer.hasRemaining() == false) {
+                buffer.clear();
+                pageId++;
+
+                if (pageId < file.getNumPages()) {
+                    System.out.println("loading page " + pageId + " \\ " + file.getNumPages());
+                    buffer = file.readPage(pageId);
+                }
+            }
+            //System.out.println("got byte: " + result[0]);
+            return result[0];
+        }
+
+        int getInt() {
+            ByteBuffer tempBuffer = ByteBuffer.allocate(4);
+            for (int i = 0; i < 4; i++) {
+                tempBuffer.put(getByte());
+            }
+
+            tempBuffer.rewind();
+            int result = tempBuffer.getInt();
+
+            //System.out.println("get int: " + result);
+            return result;
+        }
+
+        boolean hasRemaining() {
+            System.out.println("hasRemaining pageId: " + pageId + " numpages " + file.getNumPages());
+            if (pageId < file.getNumPages() - 1) {
+                System.out.println("AAAAA");
+                return true;
+            }
+
+            if (pageId == file.getNumPages() - 1 && buffer.hasRemaining()) {
+                System.out.println("BBBBB");
+                if (buffer.position() < buffer.capacity() - 4) {
+                    System.out.println("CCCC");
+                    int nextWordLength = buffer.getInt();
+                    buffer.position(buffer.position() - 4);
+                    return nextWordLength > 0;
+                }
+            }
+
+            return false;
+        }
+    }
+
+
     // Since the underlying file is based on pages, we need such an iterator to make life easier
     class HeaderFileRowIterator implements Iterator<HeaderFileRow> {
         PageFileChannel file, segmentFile;
-        ByteBuffer buffer;
+        AutoLoadBuffer buffer;
         int pageNum, offset;
 
         HeaderFileRowIterator(PageFileChannel file, PageFileChannel segmentFile) {
@@ -271,43 +339,16 @@ public class InvertedIndexManager {
 
             offset = 0;
             pageNum = 0;
-            if (pageNum < file.getNumPages()) {
-                buffer = file.readPage(pageNum);
-            }
+            buffer = new AutoLoadBuffer(file);
         }
 
         @Override public boolean hasNext() {
-            if (pageNum >= file.getNumPages()) {
-                return false;
-            }
-
-            int nextLenWord = buffer.getInt();
-            buffer.position(buffer.position()-4);
-
-            if (nextLenWord > 0) {
-                return true;
-            }
-
-            return false;
-        }
-
-        // We can add a wrapper to buffer such as AutoFlushBuffer to avoid calling loadNextPageIfNecessary() multiple times
-        private void loadNextPageIfNecessary() {
-            System.out.println("buf pos " + buffer.position() + " cap " + buffer.capacity());
-            if (buffer.position() >= buffer.capacity()) {
-                buffer.clear();
-                pageNum++;
-
-                if (pageNum < file.getNumPages()) {
-                    System.out.println("loading page " + pageNum);
-                    buffer = file.readPage(pageNum);
-                }
-            }
-
+            return buffer.hasRemaining();
         }
 
         // ToDo: cache the current page to avoid multiple read on the same page
         private List<Integer> getSegmentList(int pageId, int offset, int numOccurrence) {
+            System.out.println("get segment list; pageId: " + pageId + " offset: " + offset + " numOccu: " + numOccurrence);
             List<Integer> result = new ArrayList<>(numOccurrence);
             int numPages = (int) Math.ceil((numOccurrence * 4 + offset + 0.0) / PAGE_SIZE);
 
@@ -331,19 +372,13 @@ public class InvertedIndexManager {
 
             HeaderFileRow row = new HeaderFileRow();
             row.lenWords = buffer.getInt();
-            loadNextPageIfNecessary();
             row.bytes = new byte[row.lenWords];
-            loadNextPageIfNecessary();
             for (int i = 0; i < row.lenWords; i++) {
-                buffer.get(row.bytes, i, 1);
-                loadNextPageIfNecessary();
+                row.bytes[i] = buffer.getByte();
             }
             row.pageId = buffer.getInt();
-            loadNextPageIfNecessary();
             row.offset = buffer.getInt();
-            loadNextPageIfNecessary();
             row.numOccurrence = buffer.getInt();
-            loadNextPageIfNecessary();
 
             row.keyword = new String(row.bytes);
             row.occurrenceList = getSegmentList(row.pageId, row.offset, row.numOccurrence);
@@ -362,19 +397,27 @@ public class InvertedIndexManager {
         PageFileChannel file;
 
         AutoFlushBuffer(PageFileChannel file) {
-            this.buffer = ByteBuffer.allocate(PAGE_SIZE * 10);
+            this.buffer = ByteBuffer.allocate(PAGE_SIZE);
             this.file = file;
         }
 
         AutoFlushBuffer put(ByteBuffer bytes) {
             //System.out.println("putting " + bytes.toString());
             bytes.rewind();
-            buffer.put(bytes);
-            //System.out.println("after putting " + buffer.toString());
 
-            if (buffer.position() > PAGE_SIZE) {
-                flush();
+            while (bytes.hasRemaining()) {
+                //System.out.println("cap " + bytes.capacity() + " pos " + bytes.position());
+
+                byte[] tempByte = new byte[1];
+                bytes.get(tempByte);
+                buffer.put(tempByte);
+
+                if (buffer.hasRemaining() == false) {
+                    flush();
+                }
             }
+
+            //System.out.println("after putting " + buffer.toString());
 
             return this;
         }
