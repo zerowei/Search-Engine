@@ -504,7 +504,7 @@ public class InvertedIndexManager {
         }
 
         @Override public boolean hasNext() {
-            return iteratorA.hasNext() && iteratorB.hasNext();
+            return iteratorA.hasNext() || iteratorB.hasNext();
         }
 
         @Override public Map.Entry<Integer, Document> next() {
