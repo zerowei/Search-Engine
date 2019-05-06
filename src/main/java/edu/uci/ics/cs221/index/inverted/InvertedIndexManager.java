@@ -751,54 +751,20 @@ public class InvertedIndexManager {
             btf.clear();
             List<String> keys = new ArrayList<>(header.keySet());
             List<Set<Integer>> listOfWords = new ArrayList<>();
-            int mid = -1, low = 0, high = keys.size() - 1;
-            String lastWord = ""; Boolean flag = false;
             for (String keyword : keywords) {
                 keyword = analyzer.analyze(keyword).get(0);
-                if (keyword.compareTo(lastWord) > 0){
-                    low = mid + 1;
-                }
-                else {
-                    high = mid - 1;
-                }
-                while (low <= high) {
-                    mid = (low + high) / 2;
-                    String key = keys.get(mid);
-                    if (keyword.equals(key)) {
-                        flag = true;
-                        lastWord = key;
-                        low = 0; high = keys.size() - 1;
-                        List<Integer> nums = header.get(key);
-                        Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
-                        listOfWords.add(docIDs);
-                        break;
-                    } else if (keyword.compareTo(key) > 0) {
-                        low = mid + 1;
-                    } else {
-                        high = mid - 1;
-                    }
-                }
-                if (!flag){
-                    break;
-                }
-                else {
-                    flag = false;
+                if (keys.contains(keyword)) {
+                    List<Integer> nums = header.get(keyword);
+                    Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
+                    listOfWords.add(docIDs);
                 }
             }
-            if (keywords.size() > listOfWords.size()){
-                break;
+            if (listOfWords.size() == 0){
+                return Collections.emptyIterator();
             }
-            Set<Integer> mix = new HashSet<>();
             Set<Integer> word1 = listOfWords.get(0);
             for (int j = 1; j < listOfWords.size(); j++){
-                for (Integer ir : listOfWords.get(j)){
-                    if (word1.contains(ir)){
-                        mix.add(ir);
-                    }
-                }
-                word1.clear();
-                word1.addAll(mix);
-                mix.clear();
+                word1.retainAll(listOfWords.get(j));
             }
             String docStorePath1 = getDocumentStorePathString(i);
             DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
@@ -858,7 +824,7 @@ public class InvertedIndexManager {
         }
         List<Document> results = new ArrayList<>();
         for (int i = 0; i < getNumSegments(); i++) {
-            Map<String, List<Integer>> header = new TreeMap<>();
+            Map<String, List<Integer>> header = new HashMap<>();
             String path = indexFolder + "/header" + i + ".txt";
             Path filePath = Paths.get(path);
             PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
@@ -880,45 +846,14 @@ public class InvertedIndexManager {
             }
             //System.out.println(header);
             btf.clear();
-            List<String> keys = new ArrayList<>(header.keySet());
+            Set<String> keys = new HashSet<>(header.keySet());
             List<Set<Integer>> listOfWords = new ArrayList<>();
-            int mid = -1, low = 0, high = keys.size() - 1;
-            String lastWord = "";
-            Boolean flag = false;
             for (String keyword : keywords) {
                 keyword = analyzer.analyze(keyword).get(0);
-                if (keyword.compareTo(lastWord) > 0){
-                    low = mid + 1;
-                }
-                else {
-                    high = mid - 1;
-                }
-                while (low <= high) {
-                    mid = (low + high) / 2;
-                    String key = keys.get(mid);
-                    if (keyword.equals(key)) {
-                        lastWord = key;
-                        flag = true;
-                        List<Integer> nums = header.get(key);
-                        Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
-                        listOfWords.add(docIDs);
-                        //System.out.println(listOfWords);
-                        break;
-                    } else if (keyword.compareTo(key) > 0) {
-                        low = mid + 1;
-                    } else {
-                        high = mid - 1;
-                    }
-                }
-                if (flag) {
-                    low = 0;
-                    high = keys.size() - 1;
-                }
-                else {
-                    low = 0;
-                    high = keys.size() - 1;
-                    mid = -1;
-                    lastWord = "";
+                if (keys.contains(keyword)) {
+                    List<Integer> nums = header.get(keyword);
+                    Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
+                    listOfWords.add(docIDs);
                 }
             }
             Set<Integer> union = new HashSet<>();
@@ -1020,7 +955,6 @@ public class InvertedIndexManager {
             Document doc = documentStore.getDocument(inte);
             documents.put(inte, doc);
         }
-
         documentStore.close();
         String path = getHeaderFilePathString(segmentNum);
         Path filePath = Paths.get(path);
