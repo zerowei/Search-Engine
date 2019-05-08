@@ -1072,4 +1072,18 @@ public class InvertedIndexManager {
         return new InvertedIndexSegmentForTest(invertedLists, documents);
         //throw new UnsupportedOperationException();
     }
+
+    /**
+     * Reads a disk segment of a positional index into memory based on segmentNum.
+     * This function is mainly used for checking correctness in test cases.
+     *
+     * Throws UnsupportedOperationException if the inverted index is not a positional index.
+     *
+     * @param segmentNum n-th segment in the inverted index (start from 0).
+     * @return in-memory data structure with all contents in the index segment, null if segmentNum don't exist.
+     */
+    public PositionalIndexSegmentForTest getIndexSegmentPositional(int segmentNum) {
+        throw new UnsupportedOperationException();
+    }
+
 }
