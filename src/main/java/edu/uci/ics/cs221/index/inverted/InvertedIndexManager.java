@@ -26,6 +26,33 @@ import java.util.*;
  */
 public class InvertedIndexManager {
 
+    /** File Structure
+     *  Header File:
+     *      Each index:
+     *          4 Bytes -> number of bytes (n) of the word
+     *          n Bytes -> bytes of the word
+     *          4 Bytes -> page id of the segment in the segment file
+     *          4 Bytes -> offset of the segment in the segment file
+     *          4 Bytes -> number of segment/occurrence of the word
+     *
+     *  Segment File:
+     *      Each segment:
+     *          First Document:
+     *              4 Bytes -> the id of the first document that contains the word
+     *              4 Bytes -> page id of the position of the word in the Position File
+     *              4 Bytes -> offset of the position of the word in the Position File
+     *              4 Bytes -> number of the positions of the word in the Position File
+     *          Second Document:
+     *              4 Bytes -> the id of the second document that contains the word
+     *          ...
+     *
+     *   Position File:
+     *       Each position:
+     *          4 Bytes -> the first position of the word in the related document
+     *          4 Bytes -> the second position of the word in the related document
+     *          ...
+     */
+
     /**
      * The default flush threshold, in terms of number of documents.
      * For example, a new Segment should be automatically created whenever there's 1000 documents in the buffer.
@@ -166,16 +193,16 @@ public class InvertedIndexManager {
         documentStore.close();
 
         String headerFilePathString = getHeaderFilePathString(numSegments);
-        int len = 0;
+        int lenHeaderFile = 0;
         Path filePath = Paths.get(headerFilePathString);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
         for (String obj : buffer.keySet()) {
-            len = len + obj.getBytes().length + 4 * 4;
+            lenHeaderFile = lenHeaderFile + obj.getBytes().length + 4 * 4;
         }
 
         int pageId = 0, offset = 0;
 
-        ByteBuffer buf = ByteBuffer.allocate(len);
+        ByteBuffer buf = ByteBuffer.allocate(lenHeaderFile);
 
         for (String word : buffer.keySet()) {
             byte[] bytes = word.getBytes();
@@ -218,6 +245,26 @@ public class InvertedIndexManager {
         segmentFileChannel.appendAllBytes(byteBuffer);
         byteBuffer.clear();
         segmentFileChannel.close();
+
+        String positionFilePathString = getPositionFilePathString(numSegments);
+        PageFileChannel positionFileChannel = PageFileChannel.createOrOpen(Paths.get(positionFilePathString));
+        /*
+        // In progress
+        int totalNumAllOccurrence = 0;
+        for (List<Integer> occurrences : buffer.values()) {
+            totalNumAllOccurrence += occurrences.size();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(totalNumAllOccurrence * 4);
+        for (List<Integer> appears : buffer.values()) {
+            for (Integer i : appears) {
+                byteBuffer.putInt(i);
+            }
+        }
+        segmentFileChannel.appendAllBytes(byteBuffer);
+        byteBuffer.clear();
+        segmentFileChannel.close();
+         */
 
         if (numSegments == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
             mergeAllSegments();
