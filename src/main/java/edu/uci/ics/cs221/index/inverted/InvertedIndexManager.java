@@ -1,10 +1,13 @@
 package edu.uci.ics.cs221.index.inverted;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.Table;
 import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.File;
@@ -43,8 +46,9 @@ public class InvertedIndexManager {
 
     private Analyzer analyzer;
     private String indexFolder;
-    public TreeMap<String, List<Integer>> buffer = new TreeMap<>();
     public Map<Integer, Document> documents = new TreeMap<>();
+    public TreeMap<String, List<Integer>> buffer = new TreeMap<>();
+    private Table<String, Integer, List<Integer>> positions = HashBasedTable.create();
     public Integer numDocuments = 0;
     private Integer numSegments = 0;
 
@@ -114,7 +118,9 @@ public class InvertedIndexManager {
 
         documents.put(numDocuments, document);
         List<String> tokens = analyzer.analyze(document.getText());
-        for (String token : tokens) {
+        for (int tokenPosition = 0; tokenPosition < tokens.size(); tokenPosition++) {
+            String token = tokens.get(tokenPosition);
+
             if (buffer.containsKey(token)) {
                 List<Integer> orders = buffer.get(token);
                 if (orders.get(orders.size() - 1).equals(numDocuments) == false) {
@@ -125,7 +131,20 @@ public class InvertedIndexManager {
                 ids.add(numDocuments);
                 buffer.put(token, ids);
             }
+
+            List<Integer> positionInCurrentDocument = positions.get(token, numDocuments);
+            if (positionInCurrentDocument == null) {
+                positionInCurrentDocument = new ArrayList<>();
+            }
+
+            //System.out.println("Before " + positionInCurrentDocument);
+            positionInCurrentDocument.add(tokenPosition);
+            //System.out.println("After " + positionInCurrentDocument);
+            positions.put(token, numDocuments, positionInCurrentDocument);
+
+            //System.out.println(positions);
         }
+
         numDocuments += 1;
         if (numDocuments == DEFAULT_FLUSH_THRESHOLD) {
             flush();
@@ -138,7 +157,6 @@ public class InvertedIndexManager {
      * flush() writes the segment to disk containing the posting list and the corresponding document store.
      */
     public void flush() {
-
         if (buffer.isEmpty() && documents.isEmpty()) {
             return;
         }
