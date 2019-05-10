@@ -5,7 +5,6 @@ import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
-import org.apache.lucene.index.MergeState;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.File;
@@ -46,7 +45,7 @@ public class InvertedIndexManager {
     private String indexFolder;
     public TreeMap<String, List<Integer>> buffer = new TreeMap<>();
     public Map<Integer, Document> documents = new TreeMap<>();
-    public Integer record = 0;
+    public Integer numDocuments = 0;
     private Integer numSegments = 0;
 
     private InvertedIndexManager(String indexFolder, Analyzer analyzer) {
@@ -97,25 +96,26 @@ public class InvertedIndexManager {
      */
     public void addDocument(Document document) {
         Preconditions.checkNotNull(document);
-        documents.put(record, document);
+
+        documents.put(numDocuments, document);
         List<String> tokens = analyzer.analyze(document.getText());
         for (String token : tokens) {
             if (buffer.containsKey(token)) {
                 List<Integer> orders = buffer.get(token);
-                if (!orders.get(orders.size() - 1).equals(record)) {
-                    orders.add(record);
+                if (orders.get(orders.size() - 1).equals(numDocuments) == false) {
+                    orders.add(numDocuments);
                 }
             } else {
                 List<Integer> ids = new ArrayList<>();
-                ids.add(record);
+                ids.add(numDocuments);
                 buffer.put(token, ids);
             }
         }
-        record += 1;
-        if (record == DEFAULT_FLUSH_THRESHOLD) {
+        numDocuments += 1;
+        if (numDocuments == DEFAULT_FLUSH_THRESHOLD) {
             flush();
         }
-        //throw new UnsupportedOperationException();
+
     }
 
     // Test cases fail if return Paths.get() directly here
@@ -132,17 +132,17 @@ public class InvertedIndexManager {
      * flush() writes the segment to disk containing the posting list and the corresponding document store.
      */
     public void flush() {
+
         if (buffer.isEmpty() && documents.isEmpty()) {
             return;
         }
-        //System.out.println(buffer);
+
         Iterator<Map.Entry<Integer, Document>> itr = documents.entrySet().iterator();
         DocumentStore documentStore = MapdbDocStore.createWithBulkLoad(getDocumentStorePathString(numSegments), itr);
         documentStore.close();
+
         String headerFilePathString = getHeaderFilePathString(numSegments);
-        String segmentFilePathString = getSegmentFilePathString(numSegments);
         int len = 0;
-        numSegments += 1;
         Path filePath = Paths.get(headerFilePathString);
         PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
         for (String obj : buffer.keySet()) {
@@ -178,6 +178,7 @@ public class InvertedIndexManager {
         buf.clear();
         pageFileChannel.close();
 
+        String segmentFilePathString = getSegmentFilePathString(numSegments);
         PageFileChannel segmentFileChannel = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
         int totalNumAllOccurrence = 0;
         for (List<Integer> occurrences : buffer.values()) {
@@ -198,37 +199,13 @@ public class InvertedIndexManager {
             mergeAllSegments();
         }
 
-        record = 0;
+        numDocuments = 0;
         buffer.clear();
         documents.clear();
-        /*
-        PageFileChannel pagefile1 = PageFileChannel.createOrOpen(filePath);
-        ByteBuffer btf = pagefile1.readPage(0);
-        btf.position(4);
-        byte [] string = new byte[3];
-        btf.get(string, 0, 3);
-        String s = new String(string);
-        System.out.println(s);
-         */
-        /*
-        PageFileChannel pagefile1 = PageFileChannel.createOrOpen(segmentFilePath);
-        ByteBuffer btf = pagefile1.readAllPages();
-        btf.position(12);
-        System.out.println(btf.getInt());
-         */
-        //throw new UnsupportedOperationException();
+
+        numSegments += 1;
     }
 
-
-    private HeaderFileRow decodeHeaderFileRow(byte[] bytes) {
-        throw new NotImplementedException();
-        //return new HeaderFileRow();
-    }
-
-    private byte[] eecodeHeaderFileRow(HeaderFileRow row) {
-        throw new NotImplementedException();
-        //return new HeaderFileRow();
-    }
 
     class HeaderFileRow {
         int lenWords;
@@ -396,9 +373,6 @@ public class InvertedIndexManager {
         }
     }
 
-    private void mergeDocumentStores(int docStoreNumA, int docStoreNumB, int docStoreNumNew) {
-
-    }
 
     class AutoFlushBuffer {
         ByteBuffer buffer;
@@ -528,10 +502,6 @@ public class InvertedIndexManager {
 
     private void mergeSegments(int segNumA, int segNumB, int segNumNew) {
         //System.out.println("------- merging " + segNumA + " and " + segNumB);
-
-        int offsetHeaderFileA = 0, offsetHeaderFileB = 0;
-        int offsetSegmentFileA = 0, offsetSegmentFileB = 0;
-        int numDocumentA = 0;
 
         // To avoid the document store name duplicated with other existing ones, we name it to a temp name
         // and then rename it after the old ones are deleted
