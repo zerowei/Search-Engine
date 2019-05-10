@@ -48,6 +48,24 @@ public class InvertedIndexManager {
     public Integer numDocuments = 0;
     private Integer numSegments = 0;
 
+    private String getDocumentStorePathString(int storeNum) {
+        return indexFolder + "/docs_" + storeNum + ".db";
+    }
+
+    // Test cases fail if return Paths.get() directly here
+    private String getHeaderFilePathString(int segmentNum) {
+        return indexFolder + "/header_" + segmentNum + ".txt";
+    }
+
+    private String getSegmentFilePathString(int segmentNum) {
+        return indexFolder + "/segment_" + segmentNum + ".txt";
+    }
+
+    private String getPositionFilePathString(int segmentNum) {
+        return indexFolder + "/segment_position_" + segmentNum + ".txt";
+    }
+
+
     private InvertedIndexManager(String indexFolder, Analyzer analyzer) {
         this.analyzer = analyzer;
         this.indexFolder = indexFolder;
@@ -74,9 +92,6 @@ public class InvertedIndexManager {
         }
     }
 
-    private String getDocumentStorePathString(int storeNum) {
-        return indexFolder + "/docs" + storeNum + ".db";
-    }
 
     /**
      * Creates a positional index with the given folder, analyzer, and the compressor.
@@ -116,15 +131,6 @@ public class InvertedIndexManager {
             flush();
         }
 
-    }
-
-    // Test cases fail if return Paths.get() directly here
-    private String getHeaderFilePathString(int segmentNum) {
-        return indexFolder + "/header" + segmentNum + ".txt";
-    }
-
-    private String getSegmentFilePathString(int segmentNum) {
-        return indexFolder + "/segment" + segmentNum + ".txt";
     }
 
     /**
