@@ -68,7 +68,7 @@ public class Team11PhraseSearchTest {
     }
 
     /*
-    * Test1 tests an easy case with only 1 segment and it has 1 document. We test if it
+    * Test1 tests an easy case with only 1 segment and it has 1 document. We test if we
     * can get the right result.
     **/
     @Test
@@ -118,7 +118,8 @@ public class Team11PhraseSearchTest {
     }
 
     /*
-     * Test4 tests if the result is null when the phrase is not in all of the documents.
+     * Test4 tests if the result is null when the phrase is in the documents but not
+     * in the consecutive sequence.
      **/
     @Test
     public void PhraseSearchTest4(){
@@ -126,7 +127,7 @@ public class Team11PhraseSearchTest {
         for (Document doc : documents){
             index.addDocument(doc);
         }
-        Iterator<Document> itr = index.searchPhraseQuery(Arrays.asList("start", "sporting", "career"));
+        Iterator<Document> itr = index.searchPhraseQuery(Arrays.asList("start", "teaching", "school"));
         assertFalse(itr.hasNext());
     }
 
