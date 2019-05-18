@@ -83,15 +83,15 @@ public class Team19PositionalFlushTest {
         Map<Integer, Document> DocStore = new HashMap<>();
         DocStore.put(0, new Document("cat dog"));
         DocStore.put(1, new Document("cat elephant"));
-        DocStore.put(2, new Document("wolf dog"));
+        DocStore.put(2, new Document("wolf dog dog"));     //should be wolf dog dog instead of wolf dog
 
         Table<String, Integer, List<Integer>> Positions = HashBasedTable.create();
-        Positions.put("cat", 0, Arrays.asList(1));
-        Positions.put("cat", 1, Arrays.asList(1));
-        Positions.put("dog", 0, Arrays.asList(2));
-        Positions.put("dog", 2, Arrays.asList(2, 3));
-        Positions.put("elephant", 1, Arrays.asList(2));
-        Positions.put("wolf", 2, Arrays.asList(1));
+        Positions.put("cat", 0, Arrays.asList(0));    //position index should start from 0
+        Positions.put("cat", 1, Arrays.asList(0));
+        Positions.put("dog", 0, Arrays.asList(1));
+        Positions.put("dog", 2, Arrays.asList(1, 2));
+        Positions.put("elephant", 1, Arrays.asList(1));
+        Positions.put("wolf", 2, Arrays.asList(0));
 
         PositionalIndexSegmentForTest test = iim.getIndexSegmentPositional(0);
         assertEquals(PostingList, test.getInvertedLists());

@@ -1,3 +1,4 @@
+
 package edu.uci.ics.cs221.index.positional;
 
 import edu.uci.ics.cs221.analysis.Analyzer;

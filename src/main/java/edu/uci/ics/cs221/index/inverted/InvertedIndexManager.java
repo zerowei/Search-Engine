@@ -72,10 +72,12 @@ public class InvertedIndexManager {
 
     private Analyzer analyzer;
     private String indexFolder;
+    private Compressor compressor;
     public Map<Integer, Document> documents = new TreeMap<>();
     public Map<String, InvertedIndex> indexes = new TreeMap<>();
     public Integer numDocuments = 0;
     private Integer numSegments = 0;
+    public Boolean flag = false;
 
     private String getDocumentStorePathString(int storeNum) {
         return indexFolder + "/docs_" + storeNum + ".db";
@@ -97,6 +99,13 @@ public class InvertedIndexManager {
     private InvertedIndexManager(String indexFolder, Analyzer analyzer) {
         this.analyzer = analyzer;
         this.indexFolder = indexFolder;
+    }
+
+    private InvertedIndexManager(String indexFolder, Analyzer analyzer, Compressor compressor) {
+        this.analyzer = analyzer;
+        this.indexFolder = indexFolder;
+        this.compressor = compressor;
+        this.flag = true;
     }
 
     /**
@@ -127,7 +136,21 @@ public class InvertedIndexManager {
      *
      */
     public static InvertedIndexManager createOrOpenPositional(String indexFolder, Analyzer analyzer, Compressor compressor) {
-        return createOrOpen(indexFolder, analyzer);
+        try {
+            Path indexFolderPath = Paths.get(indexFolder);
+            if (Files.exists(indexFolderPath) && Files.isDirectory(indexFolderPath)) {
+                if (Files.isDirectory(indexFolderPath)) {
+                    return new InvertedIndexManager(indexFolder, analyzer, compressor);
+                } else {
+                    throw new RuntimeException(indexFolderPath + " already exists and is not a directory");
+                }
+            } else {
+                Files.createDirectories(indexFolderPath);
+                return new InvertedIndexManager(indexFolder, analyzer, compressor);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /**
@@ -144,31 +167,25 @@ public class InvertedIndexManager {
         for (int tokenPosition = 0; tokenPosition < tokens.size(); tokenPosition++) {
             String token = tokens.get(tokenPosition);
             List<Integer> documentIds;
-            List<Integer> positionsLastToken;
             InvertedIndex index;
 
             if (indexes.containsKey(token)) {
                 index = indexes.get(token);
-                documentIds = index.documentIds;
+                documentIds = new ArrayList<>(index.docPositions.keySet());
                 if (documentIds.get(documentIds.size() - 1).equals(numDocuments) == false) {
-                    documentIds.add(numDocuments);
+                    index.docPositions.put(numDocuments, Arrays.asList(tokenPosition));
                 }
-
-                if (index.positions.size() < documentIds.size()) {
-                    index.positions.add(new ArrayList<>());
+                else {
+                    List<Integer> positions = new ArrayList<>(index.docPositions.get(numDocuments));
+                    positions.add(tokenPosition);
+                    index.docPositions.put(numDocuments, positions);
                 }
-                positionsLastToken = index.positions.get(index.positions.size() - 1);
-                positionsLastToken.add(tokenPosition);
             } else {
-                documentIds = new ArrayList<>();
-                documentIds.add(numDocuments);
-                List<List<Integer>> positions = new ArrayList<>();
-                positions.add(new ArrayList<>());
-                positions.get(0).add(tokenPosition);
-                index = new InvertedIndex(token, documentIds, positions);
+                Map<Integer, List<Integer>> docPositions = new TreeMap<>();
+                docPositions.put(numDocuments, Arrays.asList(tokenPosition));
+                index = new InvertedIndex(token, docPositions);
                 indexes.put(token, index);
             }
-
             //System.out.println(indexes);
         }
 
@@ -180,9 +197,9 @@ public class InvertedIndexManager {
     }
 
     private void writeOneRowToFileSequentially(InvertedIndex index,
-            AutoFlushBuffer headerFileBuffer,
-            AutoFlushBuffer segmentFileBuffer,
-            AutoFlushBuffer positionFileBuffer ) {
+                                               AutoFlushBuffer headerFileBuffer,
+                                               AutoFlushBuffer segmentFileBuffer,
+                                               AutoFlushBuffer positionFileBuffer ) {
 
         //System.out.println("writing " + index.toString());
 
@@ -192,16 +209,17 @@ public class InvertedIndexManager {
         headerFileBuffer.putInt(segmentFileBuffer.getPageId());
         headerFileBuffer.putInt(segmentFileBuffer.getOffset());
 
-        assert index.documentIds.size() > 0;
-        segmentFileBuffer.putInt(index.documentIds.size());
-        for (int i = 0; i < index.documentIds.size(); i++) {
-            segmentFileBuffer.putInt(index.documentIds.get(i));
+        assert index.docPositions.keySet().size() > 0;
+        segmentFileBuffer.putInt(index.docPositions.keySet().size());
+        List<Integer> documentIds = new ArrayList<>(index.docPositions.keySet());
+        for (int i = 0; i < documentIds.size(); i++) {
+            segmentFileBuffer.putInt(documentIds.get(i));
             segmentFileBuffer.putInt(positionFileBuffer.getPageId());
             segmentFileBuffer.putInt(positionFileBuffer.getOffset());
 
-            assert index.positions.get(i).size() > 0;
-            positionFileBuffer.putInt(index.positions.get(i).size());
-            for (int position : index.positions.get(i)) {
+            assert index.docPositions.get(documentIds.get(i)).size() > 0;
+            positionFileBuffer.putInt(index.docPositions.get(documentIds.get(i)).size());
+            for (int position : index.docPositions.get(documentIds.get(i))) {
                 positionFileBuffer.putInt(position);
             }
         }
@@ -265,8 +283,8 @@ public class InvertedIndexManager {
         AutoLoadBuffer headerFileBuffer, segmentFileBuffer, positionFileBuffer;
 
         InvertedIndexIterator(PageFileChannel headerFile,
-                PageFileChannel segmentFile,
-                PageFileChannel positionFile) {
+                              PageFileChannel segmentFile,
+                              PageFileChannel positionFile) {
             this.headerFile = headerFile;
             this.segmentFile = segmentFile;
             this.positionFile = positionFile;
@@ -316,11 +334,10 @@ public class InvertedIndexManager {
             headerFileBuffer.getInt();
             headerFileBuffer.getInt();
 
-            List<Integer> documentIds = new ArrayList<>();
-            List<List<Integer>> positions = new ArrayList<>();
+            Map<Integer, List<Integer>> docPositions = new TreeMap<>();
             int numDocuments = segmentFileBuffer.getInt();
             for (int i = 0; i < numDocuments; i++) {
-                documentIds.add(segmentFileBuffer.getInt());
+                Integer documentId = segmentFileBuffer.getInt();
                 // Skip pageId and offset of position file when reading files sequentially
                 segmentFileBuffer.getInt();
                 segmentFileBuffer.getInt();
@@ -331,17 +348,25 @@ public class InvertedIndexManager {
                 for (int j = 0; j < numCurrentSegmentPositions; j++) {
                     currentSegmentPositions.add(positionFileBuffer.getInt());
                 }
-                positions.add(currentSegmentPositions);
+                docPositions.put(documentId, currentSegmentPositions);
             }
 
-            InvertedIndex result = new InvertedIndex(keyword, documentIds, positions);
+            InvertedIndex result = new InvertedIndex(keyword, docPositions);
             //System.out.println(result);
             return result;
         }
 
         // Find the next index that matches the keyword
         public InvertedIndex next(String keyword) {
-            throw new NotImplementedException();
+
+            while (hasNext()) {
+                InvertedIndex result = next();
+                //System.out.println(result);
+                if (result.keyword.equals(keyword)) {
+                    return result;
+                }
+            }
+            return new InvertedIndex(new String(), new TreeMap<>());
         }
     }
 
@@ -477,21 +502,17 @@ public class InvertedIndexManager {
             if (indexA != null && indexB != null && indexA.keyword.compareTo(indexB.keyword) == 0) {
                 String keyword = indexA.keyword;
 
-                List<Integer> documentIds = new ArrayList<>();
-                documentIds.addAll(indexA.documentIds);
-                for (int documentId : indexB.documentIds) {
-                    // ToDo: maybe use long instead of int?
-                    documentIds.add(new Integer((int) (documentId + documentStoreA.size())));
+                Map<Integer, List<Integer>> docPositions = indexA.docPositions;
+                Map<Integer, List<Integer>> docPositionsB = new TreeMap<>();
+                for (Integer integer : indexB.docPositions.keySet()){
+                    docPositionsB.put(integer + (int) documentStoreA.size(), indexB.docPositions.get(integer));
                 }
-
-                List<List<Integer>> positions = new ArrayList<>();
-                positions.addAll(indexA.positions);
-                positions.addAll(indexB.positions);
+                docPositions.putAll(docPositionsB);
 
                 //System.out.println("\nindex A \t" + indexA.toString());
                 //System.out.println("index B \t" + indexB.toString());
 
-                indexNew = new InvertedIndex(keyword, documentIds, positions);
+                indexNew = new InvertedIndex(keyword, docPositions);
 
                 indexA = iteratorA.next();
                 indexB = iteratorB.next();
@@ -503,10 +524,12 @@ public class InvertedIndexManager {
 
                 indexA = iteratorA.next();
             } else if (indexB != null && (indexA == null || indexA.keyword.compareTo(indexB.keyword) > 0)) {
-                indexNew = indexB;
-                for (int i = 0; i < indexNew.documentIds.size(); i++) {
-                    indexNew.documentIds.set(i, (int) (indexNew.documentIds.get(i) + documentStoreA.size()));
+                String keyword = indexB.keyword;
+                Map<Integer, List<Integer>> docPositionsB = new TreeMap<>();
+                for (Integer integer : indexB.docPositions.keySet()){
+                    docPositionsB.put(integer + (int) documentStoreA.size(), indexB.docPositions.get(integer));
                 }
+                indexNew = new InvertedIndex(keyword, docPositionsB);
 
                 //System.out.println("\nindex B \t" + indexB.toString());
 
@@ -569,84 +592,62 @@ public class InvertedIndexManager {
      * @return a iterator of documents matching the query
      */
     public Iterator<Document> searchQuery(String keyword) {
-
         Preconditions.checkNotNull(keyword);
         if (keyword.equals("")) {
             return Collections.emptyIterator();
         }
+
         List<Document> results = new ArrayList<>();
         keyword = analyzer.analyze(keyword).get(0);
+
         for (int i = 0; i < getNumSegments(); i++) {
-            String headerFilePathString = getHeaderFilePathString(i);
-            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(Paths.get(headerFilePathString));
-            ByteBuffer btf = pageFileChannel.readAllPages();
-            btf.flip();
-            int pageID=0, offset=0, length=0;
-            String key = "";
-            while (btf.hasRemaining()) {
-                int wordLength = btf.getInt();
-                if (wordLength == 0)
-                    break;
-                byte[] dst = new byte[wordLength];
-                btf.get(dst, 0, wordLength);
-                pageID = btf.getInt();
-                offset = btf.getInt();
-                length = btf.getInt();
-                key = new String(dst);
-                if (keyword.equals(key)) {
+            PageFileChannel headerFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getHeaderFilePathString(i)
+                    ));
+            PageFileChannel segmentFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getSegmentFilePathString(i)
+                    ));
+
+            AutoLoadBuffer headerFileBuffer = new AutoLoadBuffer(headerFileChannel);
+
+            String word = "";
+            int pageId = 0, offset = 0;
+
+            while (headerFileBuffer.hasRemaining()) {
+                int lenWords = headerFileBuffer.getInt();
+                byte[] wordBytes = new byte[lenWords];
+                for (int j = 0; j < lenWords; j++) {
+                    wordBytes[j] = headerFileBuffer.getByte();
+                }
+                word = new String(wordBytes);
+                pageId = headerFileBuffer.getInt();
+                offset = headerFileBuffer.getInt();
+                if (word.equals(keyword)){
                     break;
                 }
-            }
-            //System.out.println(key);
-            //System.out.println(pageID);
-            //System.out.println(offset);
-            //System.out.println(length);
-            if (!key.equals(keyword)){
-                return Collections.emptyIterator();
             }
 
-            String segmentFilePathString = getSegmentFilePathString(i);
-            //System.out.println(segmentFilePathString);
-            PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(Paths.get(segmentFilePathString));
-            byte[] docs = new byte[length * 4];
-            int pages;
-            if (length*4 <= PAGE_SIZE - offset) {
-                pages = 1;
-            } else {
-                int extraPages = (length*4 - (PAGE_SIZE - offset)) / PAGE_SIZE;
-                int pos = (length*4 - (PAGE_SIZE - offset)) % PAGE_SIZE;
-                if (pos == 0) {
-                    pages = extraPages + 1;
-                } else {
-                    pages = extraPages + 2;
-                }
+            if (!word.equals(keyword)){
+                headerFileChannel.close();
+                segmentFileChannel.close();
+                continue;
             }
-            ByteBuffer buf = ByteBuffer.allocate(pages * PAGE_SIZE);
-            for (int j = 0; j < pages; j++) {
-                buf.put(pageFileChannel1.readPage(pageID + j));
+
+            Set<Integer> documentIds = getDocumentIds(segmentFileChannel, pageId, offset);
+            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(i));
+
+            for (Integer documentId : documentIds){
+                results.add(documentStore.getDocument(documentId));
             }
-            buf.position(offset);
-            buf.get(docs, 0, length * 4);
-            ByteBuffer dor = ByteBuffer.allocate(length * 4);
-            dor.put(docs);
-            dor.flip();
-            List<Integer> docIDs = new ArrayList<>();
-            while (dor.hasRemaining()) {
-                int docID = dor.getInt();
-                //System.out.println(docID);
-                docIDs.add(docID);
-            }
-            String docStorePath1 = getDocumentStorePathString(i);
-            DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
-            for (Integer e : docIDs){
-                results.add(documentStore1.getDocument(e));
-            }
-            documentStore1.close();
-            pageFileChannel.close();
-            pageFileChannel1.close();
+            documentStore.close();
+            headerFileChannel.close();
+            segmentFileChannel.close();
         }
+
         return results.iterator();
-         //throw new UnsupportedOperationException();
+        //throw new UnsupportedOperationException();
     }
 
     /**
@@ -660,93 +661,95 @@ public class InvertedIndexManager {
         if (keywords.equals(Arrays.asList(""))){
             return Collections.emptyIterator();
         }
+
         List<Document> results = new ArrayList<>();
+        List<String> words = new ArrayList<>();
+        for (String keyword : keywords){
+            words.add(analyzer.analyze(keyword).get(0));
+        }
+
         for (int i = 0; i < getNumSegments(); i++) {
-            Map<String, List<Integer>> header = new TreeMap<>();
-            String path = indexFolder + "/header" + i + ".txt";
-            Path filePath = Paths.get(path);
-            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
-            ByteBuffer btf = pageFileChannel.readAllPages();
-            pageFileChannel.close();
-            btf.flip();
-            while (btf.hasRemaining()) {
-                int wordLength = btf.getInt();
-                if (wordLength == 0)
-                    break;
-                byte[] dst = new byte[wordLength];
-                btf.get(dst, 0, wordLength);
-                String key = new String(dst);
-                int pageID = btf.getInt();
-                int offset = btf.getInt();
-                int length = btf.getInt();
-                List<Integer> paras = Arrays.asList(pageID, offset, length);
-                header.put(key, paras);
+            List<List<Integer>> header = new ArrayList<>();
+            PageFileChannel headerFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getHeaderFilePathString(i)
+                    ));
+            PageFileChannel segmentFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getSegmentFilePathString(i)
+                    ));
+
+            AutoLoadBuffer headerFileBuffer = new AutoLoadBuffer(headerFileChannel);
+
+            while (headerFileBuffer.hasRemaining()) {
+                int lenWords = headerFileBuffer.getInt();
+                byte[] wordBytes = new byte[lenWords];
+                for (int j = 0; j < lenWords; j++) {
+                    wordBytes[j] = headerFileBuffer.getByte();
                 }
-            btf.clear();
-            List<String> keys = new ArrayList<>(header.keySet());
-            List<Set<Integer>> listOfWords = new ArrayList<>();
-            for (String keyword : keywords) {
-                keyword = analyzer.analyze(keyword).get(0);
-                if (keys.contains(keyword)) {
-                    List<Integer> nums = header.get(keyword);
-                    Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
-                    listOfWords.add(docIDs);
-                } else {
-                    return Collections.emptyIterator();
+                String word = new String(wordBytes);
+                int pageId = headerFileBuffer.getInt();
+                int offset = headerFileBuffer.getInt();
+                if (words.contains(word)) {
+                    List<Integer> paras = Arrays.asList(pageId, offset);
+                    header.add(paras);
                 }
             }
-            if (listOfWords.size() == 0){
-                return Collections.emptyIterator();
+
+            if (header.size() != words.size()){
+                headerFileChannel.close();
+                segmentFileChannel.close();
+                continue;
             }
-            Set<Integer> word1 = listOfWords.get(0);
-            for (int j = 1; j < listOfWords.size(); j++){
-                word1.retainAll(listOfWords.get(j));
+
+            Set<Integer> intersection = getDocumentIds(segmentFileChannel, header.get(0).get(0), header.get(0).get(1));
+
+            for (int j = 1; j < header.size(); j++){
+                intersection.retainAll(getDocumentIds(segmentFileChannel, header.get(j).get(0), header.get(j).get(1)));
             }
-            String docStorePath1 = getDocumentStorePathString(i);
-            DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
-            for (Integer e : word1){
-                results.add(documentStore1.getDocument(e));
+
+            if (intersection.size() == 0){
+                headerFileChannel.close();
+                segmentFileChannel.close();
+                continue;
             }
-            documentStore1.close();
+
+            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(i));
+            for (Integer e : intersection){
+                results.add(documentStore.getDocument(e));
+            }
+
+            documentStore.close();
+            headerFileChannel.close();
+            segmentFileChannel.close();
         }
         return results.iterator();
         // throw new UnsupportedOperationException();
     }
 
-    public Set<Integer> getIDs(int i, int pageID, int offset, int length){
-        String path1 = indexFolder + "/segment" + i + ".txt";
-        Path filePath1 = Paths.get(path1);
-        PageFileChannel pageFileChannel1 = PageFileChannel.createOrOpen(filePath1);
-        byte[] docs = new byte[length * 4];
-        int pages;
-        if (length*4 <= PAGE_SIZE - offset) {
-            pages = 1;
-        } else {
-            int extraPages = (length*4 - (PAGE_SIZE - offset)) / PAGE_SIZE;
-            int pos = (length*4 - (PAGE_SIZE - offset)) % PAGE_SIZE;
-            if (pos == 0) {
-                pages = extraPages + 1;
-            } else {
-                pages = extraPages + 2;
-            }
+    public Set<Integer> getDocumentIds(PageFileChannel segmentFileChannel, int pageId, int offset){
+        ByteBuffer buffer4Length = segmentFileChannel.readPage(pageId);
+        buffer4Length.put(segmentFileChannel.readPage(pageId + 1));
+        buffer4Length.position(offset);
+        int numOccurrence = buffer4Length.getInt();
+        Set<Integer> result = new HashSet<>(numOccurrence);
+        int numPages = (int) Math.ceil((numOccurrence * 4 + offset + 0.0) / PAGE_SIZE);
+
+        ByteBuffer buffer = ByteBuffer.allocate(PAGE_SIZE * numPages);
+        for (int i = pageId; i < pageId + numPages; i++) {
+            buffer.put(segmentFileChannel.readPage(i));
         }
-        ByteBuffer buf = ByteBuffer.allocate(pages * PAGE_SIZE);
-        for (int j = 0; j < pages; j++) {
-            buf.put(pageFileChannel1.readPage(pageID + j));
+        buffer.rewind();
+        buffer.position(offset + 4);
+        for (int j = 0; j < numOccurrence; j++) {
+            result.add(buffer.getInt());
+            buffer.getInt();
+            buffer.getInt();
         }
-        buf.position(offset);
-        buf.get(docs, 0, length * 4);
-        ByteBuffer dor = ByteBuffer.allocate(length * 4);
-        dor.put(docs);
-        dor.flip();
-        Set<Integer> docIDs = new HashSet<>();
-        while (dor.hasRemaining()) {
-            int docID = dor.getInt();
-            docIDs.add(docID);
-        }
-        pageFileChannel1.close();
-        return docIDs;
+
+        return result;
     }
+
     /**
      * Performs an OR boolean search on the inverted index.
      *
@@ -758,51 +761,62 @@ public class InvertedIndexManager {
         if (keywords.equals(Arrays.asList(""))){
             return Collections.emptyIterator();
         }
+
         List<Document> results = new ArrayList<>();
+        List<String> words = new ArrayList<>();
+        for (String keyword : keywords){
+            words.add(analyzer.analyze(keyword).get(0));
+        }
+
         for (int i = 0; i < getNumSegments(); i++) {
-            Map<String, List<Integer>> header = new HashMap<>();
-            String path = indexFolder + "/header" + i + ".txt";
-            Path filePath = Paths.get(path);
-            PageFileChannel pageFileChannel = PageFileChannel.createOrOpen(filePath);
-            ByteBuffer btf = pageFileChannel.readAllPages();
-            pageFileChannel.close();
-            btf.flip();
-            while (btf.hasRemaining()) {
-                int wordLength = btf.getInt();
-                if (wordLength == 0)
-                    break;
-                byte[] dst = new byte[wordLength];
-                btf.get(dst, 0, wordLength);
-                String key = new String(dst);
-                int pageID = btf.getInt();
-                int offset = btf.getInt();
-                int length = btf.getInt();
-                List<Integer> paras = Arrays.asList(pageID, offset, length);
-                header.put(key, paras);
-            }
-            //System.out.println(header);
-            btf.clear();
-            Set<String> keys = new HashSet<>(header.keySet());
-            List<Set<Integer>> listOfWords = new ArrayList<>();
-            for (String keyword : keywords) {
-                keyword = analyzer.analyze(keyword).get(0);
-                if (keys.contains(keyword)) {
-                    List<Integer> nums = header.get(keyword);
-                    Set<Integer> docIDs = getIDs(i, nums.get(0), nums.get(1), nums.get(2));
-                    listOfWords.add(docIDs);
+            List<List<Integer>> header = new ArrayList<>();
+            PageFileChannel headerFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getHeaderFilePathString(i)
+                    ));
+            PageFileChannel segmentFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getSegmentFilePathString(i)
+                    ));
+
+            AutoLoadBuffer headerFileBuffer = new AutoLoadBuffer(headerFileChannel);
+
+            while (headerFileBuffer.hasRemaining()) {
+                int lenWords = headerFileBuffer.getInt();
+                byte[] wordBytes = new byte[lenWords];
+                for (int j = 0; j < lenWords; j++) {
+                    wordBytes[j] = headerFileBuffer.getByte();
+                }
+                String word = new String(wordBytes);
+                int pageId = headerFileBuffer.getInt();
+                int offset = headerFileBuffer.getInt();
+                if (words.contains(word)) {
+                    List<Integer> paras = Arrays.asList(pageId, offset);
+                    header.add(paras);
                 }
             }
-            Set<Integer> union = new HashSet<>();
-            for (Set<Integer> ir : listOfWords){
-                union.addAll(ir);
-                }
-            //System.out.println(union);
-            String docStorePath1 = getDocumentStorePathString(i);
-            DocumentStore documentStore1 = MapdbDocStore.createOrOpenReadOnly(docStorePath1);
+
+            if (header.isEmpty()){
+                headerFileChannel.close();
+                segmentFileChannel.close();
+                continue;
+            }
+
+            Set<Integer> union = getDocumentIds(segmentFileChannel, header.get(0).get(0), header.get(0).get(1));
+            System.out.println(union);
+
+            for (int j = 1; j < header.size(); j++){
+                union.addAll(getDocumentIds(segmentFileChannel, header.get(j).get(0), header.get(j).get(1)));
+            }
+
+            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(i));
             for (Integer e : union){
-                results.add(documentStore1.getDocument(e));
+                results.add(documentStore.getDocument(e));
             }
-            documentStore1.close();
+
+            documentStore.close();
+            headerFileChannel.close();
+            segmentFileChannel.close();
         }
         return results.iterator();
         // throw new UnsupportedOperationException();
@@ -853,10 +867,108 @@ public class InvertedIndexManager {
      * @param phrase, a consecutive sequence of keywords
      * @return a iterator of documents matching the query
      */
+
     public Iterator<Document> searchPhraseQuery(List<String> phrase) {
+
         Preconditions.checkNotNull(phrase);
 
-        throw new UnsupportedOperationException();
+        if (!flag){
+            throw new UnsupportedOperationException();
+        }
+
+        if (phrase.equals(Arrays.asList(""))){
+            return Collections.emptyIterator();
+        }
+        if (phrase.isEmpty()){
+            return Collections.emptyIterator();
+        }
+
+        Map<String, Integer> OrderdPhrase = new TreeMap<>();
+        List<Document> finalResults = new ArrayList<>();
+        int order = 0;
+
+        for (int i = 0; i < phrase.size(); i++){
+            if (analyzer.analyze(phrase.get(i)).isEmpty()){
+                continue;
+            }
+            String token = analyzer.analyze(phrase.get(i)).get(0);
+            OrderdPhrase.put(token, order);
+            order++;
+        }
+
+        for (int j = 0; j < numSegments; j++){
+            PageFileChannel headerFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getHeaderFilePathString(j)
+                    ));
+            PageFileChannel segmentFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getSegmentFilePathString(j)
+                    ));
+            PageFileChannel positionFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getPositionFilePathString(j)
+                    ));
+
+            InvertedIndexIterator itr = new InvertedIndexIterator(
+                    headerFileChannel, segmentFileChannel, positionFileChannel);
+
+            List<String> tokens = new ArrayList<>(OrderdPhrase.keySet());
+            String firstKeyword = tokens.get(0);
+            Set<Integer> intersection = new HashSet<>(itr.next(firstKeyword).docPositions.keySet());
+
+            if (intersection.isEmpty()){
+                headerFileChannel.close();
+                segmentFileChannel.close();
+                positionFileChannel.close();
+                continue;
+            }
+
+            for (int k = 1; k < tokens.size(); k++){
+                intersection.retainAll(itr.next(tokens.get(k)).docPositions.keySet());
+                if (intersection.isEmpty()){
+                    break;
+                }
+            }
+            if (intersection.isEmpty()){
+                headerFileChannel.close();
+                segmentFileChannel.close();
+                positionFileChannel.close();
+                continue;
+            }
+
+
+            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(j));
+
+            for (Integer integer: intersection){
+                InvertedIndexIterator newItr = new InvertedIndexIterator(
+                        headerFileChannel, segmentFileChannel, positionFileChannel);
+                List<Integer> position4Firstword = newItr.next(firstKeyword).docPositions.get(integer);
+
+                for (int l = 1; l < tokens.size(); l++){
+                    int subtract = OrderdPhrase.get(tokens.get(l)) - OrderdPhrase.get(tokens.get(l-1));
+
+                    for (int m = 0; m < position4Firstword.size(); m++){
+                        int newPosition = position4Firstword.get(m)+subtract;
+                        position4Firstword.set(m, newPosition);
+                    }
+
+                    position4Firstword.retainAll(newItr.next(tokens.get(l)).docPositions.get(integer));
+
+
+                }
+                if (!position4Firstword.isEmpty()){
+                    finalResults.add(documentStore.getDocument(integer));
+                }
+            }
+            documentStore.close();
+            headerFileChannel.close();
+            segmentFileChannel.close();
+            positionFileChannel.close();
+
+        }
+        return finalResults.iterator();
+
     }
 
     /**
@@ -930,10 +1042,12 @@ public class InvertedIndexManager {
 
         while (indexIterator.hasNext()) {
             InvertedIndex index = indexIterator.next();
-            invertedLists.put(index.keyword, index.documentIds);
+            List<Integer> docIds = new ArrayList<>(index.docPositions.keySet());
+            invertedLists.put(index.keyword, docIds);
 
-            for (int i = 0; i < index.documentIds.size(); i++) {
-                positions.put(index.keyword, index.documentIds.get(i), index.positions.get(i));
+            for (int i = 0; i < docIds.size(); i++) {
+                Integer docId = docIds.get(i);
+                positions.put(index.keyword, docId, index.docPositions.get(docId));
             }
         }
 
