@@ -1,6 +1,5 @@
 package edu.uci.ics.cs221.index.inverted;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -14,10 +13,8 @@ public class InvertedIndex {
     }
 
     @Override public String toString() {
-        System.out.println(docPositions);
-        Iterator<List<Integer>> itr = docPositions.values().iterator();
-        while (itr.hasNext()){
-            assert itr.next().size() > 0;
+        for (List<Integer> positions : docPositions.values()) {
+            assert positions.size() > 0;
         }
 
         return "InvertedIndex{" +
@@ -27,4 +24,3 @@ public class InvertedIndex {
                 "}";
     }
 }
-
