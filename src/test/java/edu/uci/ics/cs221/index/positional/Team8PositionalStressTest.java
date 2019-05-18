@@ -3,8 +3,8 @@ package edu.uci.ics.cs221.index.positional;
 import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.index.inverted.*;
 import edu.uci.ics.cs221.storage.Document;
-import org.junit.After;
-import org.junit.Test;
+import org.junit.*;
+import org.junit.rules.Timeout;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -17,20 +17,18 @@ import static junit.framework.TestCase.assertTrue;
 
 public class Team8PositionalStressTest {
 
-    private Analyzer analyzer = new ComposableAnalyzer(new PunctuationTokenizer(),new PorterStemmer());
-    private Compressor compressor = new DeltaVarLenCompressor();
-    private InvertedIndexManager invertedIndexManager;
-    private int docNum = 200000;
-    private String textUrl = "https://raw.githubusercontent.com/NinoXing/Resource-UCI-CS221/master/Team8StressTest.txt";
-    private String pathName = "./index/Team8PositionalStressTest";
+    @ClassRule
+    public static Timeout classTimeout = Timeout.seconds(600);
 
+    private static Analyzer analyzer = new ComposableAnalyzer(new PunctuationTokenizer(),new PorterStemmer());
+    private static Compressor compressor = new DeltaVarLenCompressor();
+    private static InvertedIndexManager invertedIndexManager;
+    private static int docNum = 200000;
+    private static String textUrl = "https://raw.githubusercontent.com/NinoXing/Resource-UCI-CS221/master/Team8StressTest.txt";
+    private static String pathName = "./index/Team8PositionalStressTest";
 
-    //Use the stress test structure modified by TA in project2
-
-    //init and go on testing
-    //timeout is 20 min.
-    @Test(timeout = 1200000)
-    public void init(){
+    @BeforeClass
+    public static void init(){
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 5000;
         InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 12;
 
@@ -45,47 +43,12 @@ public class Team8PositionalStressTest {
         for(int i=0;i<docNum;i++){
             invertedIndexManager.addDocument(new Document(textContent.get(i%textContent.size())));
         }
-        assertTrue(PageFileChannel.writeCounter>=docNum/invertedIndexManager.DEFAULT_FLUSH_THRESHOLD);
-
-
-        try {
-            test1();
-        } catch (Throwable e) {
-            System.out.println("Team8PositionalStressTest test1 FAILED");
-            e.printStackTrace();
-        }
-
-        try {
-            test2();
-        } catch (Throwable e) {
-            System.out.println("Team8PositionalStressTest test2 FAILED");
-            e.printStackTrace();
-        }
-
-        try {
-            test3();
-        } catch (Throwable e) {
-            System.out.println("Team8PositionalStressTest test3 FAILED");
-            e.printStackTrace();
-        }
-
-        try {
-            test4();
-        } catch (Throwable e) {
-            System.out.println("Team8PositionalStressTest test4 FAILED");
-            e.printStackTrace();
-        }
-
-        try {
-            test5();
-        } catch (Throwable e) {
-            System.out.println("Team8PositionalStressTest test5 FAILED");
-            e.printStackTrace();
-        }
+        assertTrue(PageFileChannel.writeCounter>=docNum/InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD);
 
     }
 
     //Test if all the documents have been flushed into segments
+    @Test
     public void test1(){
         int res = 0;
         for(int i = 0; i < invertedIndexManager.getNumSegments(); ++i){
@@ -97,6 +60,7 @@ public class Team8PositionalStressTest {
     }
 
     //Test if the searchQuery function still works well
+    @Test
     public void test2(){
         Iterator<Document> res = invertedIndexManager.searchQuery("apple");
         int count = 0;
@@ -109,6 +73,7 @@ public class Team8PositionalStressTest {
 
 
     //Test if the searchAndQuery function still works well
+    @Test
     public void test3(){
         Iterator<Document> res = invertedIndexManager.searchAndQuery(Arrays.asList("Fortune","butter"));
         assertTrue(!res.hasNext());
@@ -116,6 +81,7 @@ public class Team8PositionalStressTest {
 
 
     //Test if the searchOrQuery function still works well
+    @Test
     public void test4(){
         Iterator<Document> res = invertedIndexManager.searchOrQuery(Arrays.asList("apple","Judge"));
         int count = 0;
@@ -128,6 +94,7 @@ public class Team8PositionalStressTest {
 
 
     //Test if the searchPhraseQuery function works well
+    @Test
     public void test5(){
         Iterator<Document> res = invertedIndexManager.searchPhraseQuery(Arrays.asList("first","sight"));
         int count = 0;
@@ -140,8 +107,8 @@ public class Team8PositionalStressTest {
 
 
     //Clean up and reset threshold
-    @After
-    public void after(){
+    @AfterClass
+    public static void after(){
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1000;
         InvertedIndexManager.DEFAULT_MERGE_THRESHOLD = 8;
 
@@ -154,13 +121,13 @@ public class Team8PositionalStressTest {
             }
             files.delete();
         }catch (Exception e){
-            System.out.println("Error when deleting files");
+            throw new RuntimeException(e);
         }
 
     }
 
     //Get text content from a URL
-    private List<String> getContent(String URL){
+    private static List<String> getContent(String URL) {
         List<String> res = new ArrayList<>();
         try {
             java.net.URL url = new URL(URL);

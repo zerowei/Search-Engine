@@ -54,7 +54,6 @@ public class Team22FlushTest {
     }
 
 
-
     /*
     This test case check whether flushed segment stored correctly
     We check for both 1. invertedIndexList 2. documents store

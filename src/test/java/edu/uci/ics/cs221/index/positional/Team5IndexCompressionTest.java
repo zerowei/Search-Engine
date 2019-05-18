@@ -33,7 +33,6 @@ public class Team5IndexCompressionTest {
 
   @Before
   public void setup() {
-    //    InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 10001;
     File directory1 = new File(path1);
     if (!directory1.exists()) {
       directory1.mkdirs();
@@ -46,6 +45,7 @@ public class Team5IndexCompressionTest {
         InvertedIndexManager.createOrOpenPositional(path1, analyzer, naivecompressor);
     positional_list_compressor =
         InvertedIndexManager.createOrOpenPositional(path2, analyzer, compressor);
+    PageFileChannel.resetCounters();
   }
 
   // test simple documents with same text, each key word show only one time each document

@@ -29,15 +29,6 @@ public class Team2CompressorTest {
 
     /**
      * In the following test,
-     * we test if the compressor works fine when the encoded and decoded subjects are empty.
-     */
-    @Test
-    public void emptyTest() {
-        fullTest(new ArrayList<>(), new byte[0]);
-    }
-
-    /**
-     * In the following test,
      * we test on lists with single element.
      * We test general cases like 131, 127 and 3,
      * and special cases like 16384, 128 and 0.

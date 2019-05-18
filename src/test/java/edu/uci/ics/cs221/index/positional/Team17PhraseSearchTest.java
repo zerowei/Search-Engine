@@ -19,8 +19,8 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 
 public class Team17PhraseSearchTest {
-    private final String path = "./index/Team17";
-    private Document doc1 = new Document("too young, very simple, sometimes naive");
+    private final String path = "./index/Team17PhraseSearchTest";
+    private Document doc1 = new Document("too young, too simple, sometimes naive");
     private Document doc2 = new Document("I'm angry!");
     private Document doc3 = new Document("The West Virginia Central Junction is a place in United States of America");
     private Document doc4 = new Document("Los Ranchos de Albuquerque is the name of a place");

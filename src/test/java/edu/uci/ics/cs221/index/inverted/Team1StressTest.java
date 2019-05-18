@@ -102,6 +102,7 @@ public class Team1StressTest {
 
         assertTrue(PageFileChannel.writeCounter >= 11);
         assertTrue(PageFileChannel.readCounter >= 2);
+
         Iterator<Document> itr =
                 iim.searchAndQuery(Arrays.asList("GibberishThatNotInDoc", "university"));
         assertTrue(!itr.hasNext());

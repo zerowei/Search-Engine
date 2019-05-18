@@ -41,8 +41,8 @@ public class Team19PositionalFlushTest {
     public void setup() throws Exception {
         Path path = Paths.get(file);
         Files.deleteIfExists(path);
-        iim = iim.createOrOpenPositional(file, an, cp);
-        iim.DEFAULT_FLUSH_THRESHOLD = 3;
+        iim = InvertedIndexManager.createOrOpenPositional(file, an, cp);
+        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 3;
     }
 
     @After
@@ -60,7 +60,7 @@ public class Team19PositionalFlushTest {
         }
         Files.deleteIfExists(Paths.get(file));
 
-        iim.DEFAULT_FLUSH_THRESHOLD = 1000;
+        InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1000;
     }
 
     // test flush when flush() is called automatically, whether the total number of segments is correct
@@ -83,10 +83,10 @@ public class Team19PositionalFlushTest {
         Map<Integer, Document> DocStore = new HashMap<>();
         DocStore.put(0, new Document("cat dog"));
         DocStore.put(1, new Document("cat elephant"));
-        DocStore.put(2, new Document("wolf dog dog"));     //should be wolf dog dog instead of wolf dog
+        DocStore.put(2, new Document("wolf dog dog"));
 
         Table<String, Integer, List<Integer>> Positions = HashBasedTable.create();
-        Positions.put("cat", 0, Arrays.asList(0));    //position index should start from 0
+        Positions.put("cat", 0, Arrays.asList(0));
         Positions.put("cat", 1, Arrays.asList(0));
         Positions.put("dog", 0, Arrays.asList(1));
         Positions.put("dog", 2, Arrays.asList(1, 2));

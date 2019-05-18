@@ -103,7 +103,7 @@ public class Team14PhraseSearchTest {
         queryIndex(Arrays.asList("movie", "theater"), 2);
         queryIndex(Arrays.asList("credit", "card"), 1);
         queryIndex(Arrays.asList("diced", "pineapples"), 3);
-        queryIndex(Arrays.asList("eat", "pineapples"), 4);   //should be 4 instead of 2
+        queryIndex(Arrays.asList("eat", "pineapples"), 4);
         queryIndex(Arrays.asList("San", "Diego"), 3);
         queryIndex(Arrays.asList("Avengers", "Movie"), 2);
         queryIndex(Arrays.asList("next", "week"), 2);
