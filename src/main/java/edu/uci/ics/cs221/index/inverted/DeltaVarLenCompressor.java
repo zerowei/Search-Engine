@@ -13,6 +13,11 @@ public class DeltaVarLenCompressor implements Compressor {
     public byte[] encode(List<Integer> integers) {
         List<Integer> differences = new ArrayList<>();
         List<Byte> finalResult  = new ArrayList<>();
+
+        if (integers.isEmpty()){
+            return new byte[0];
+        }
+
         differences.add(integers.get(0));
 
         for (int i  = 1; i < integers.size(); i++){
@@ -21,6 +26,11 @@ public class DeltaVarLenCompressor implements Compressor {
         }
 
         for (Integer difference : differences){
+            if (difference == 0){
+                finalResult.add(difference.byteValue());
+                continue;
+            }
+
             String result = "";
             List<String> VBCodes = new ArrayList<>();
             int key;
@@ -47,7 +57,7 @@ public class DeltaVarLenCompressor implements Compressor {
                 }
             }
 
-            if (VBCodes.size() >= 1){
+            if (VBCodes.size() >= 1 && !result.equals("")){
                 StringBuilder zeros = new StringBuilder();
                 for (int k = 0; k < 7-result.length(); k++){
                     zeros.append("0");
@@ -55,7 +65,7 @@ public class DeltaVarLenCompressor implements Compressor {
                 result = 1 + zeros.toString() + result;
                 VBCodes.add(result);
             }
-            else {
+            else if (VBCodes.size() == 0 && !result.equals("")){
                 StringBuilder zeros = new StringBuilder();
                 for (int l = 0; l < 7-result.length(); l++){
                     zeros.append("0");
