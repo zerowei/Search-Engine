@@ -36,6 +36,15 @@ public class AutoLoadBuffer {
         return result[0];
     }
 
+    byte[] getByteArray(int lengthByteArray) {
+        byte[] result = new byte[lengthByteArray];
+        for (int i = 0; i < lengthByteArray; i++) {
+            result[i] = getByte();
+        }
+
+        return result;
+    }
+
     int getInt() {
         ByteBuffer tempBuffer = ByteBuffer.allocate(4);
         for (int i = 0; i < 4; i++) {
@@ -64,6 +73,23 @@ public class AutoLoadBuffer {
         }
 
         return false;
+    }
+
+    void setPageIdAndOffset(int pageId, int offset) {
+        buffer.clear();
+        buffer = file.readPage(pageId);
+        this.pageId = pageId;
+        buffer.position(offset);
+    }
+
+    void setRID(int RID) {
+        pageId = RID / PAGE_SIZE;
+        int offset = RID % PAGE_SIZE;
+
+        buffer.clear();
+        buffer = file.readPage(pageId);
+        buffer.position(offset);
+
     }
 }
 

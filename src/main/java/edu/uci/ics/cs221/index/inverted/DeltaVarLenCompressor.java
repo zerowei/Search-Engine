@@ -31,9 +31,10 @@ public class DeltaVarLenCompressor implements Compressor {
                 continue;
             }
 
-            String result = "";
-            List<String> VBCodes = new ArrayList<>();
+            int result = 0;
+            List<Integer> VBCodes = new ArrayList<>();
             int key;
+            int t = 0;
 
             for (int j = difference; j >= 1; j = j / 2){
                 if (j % 2 == 0){
@@ -43,40 +44,31 @@ public class DeltaVarLenCompressor implements Compressor {
                     key = 1;
                 }
 
-                result = key + result;
+                result += key * Math.pow(2, t);
+                t++;
 
-                if (result.length() == 7){
+                if (t == 7){
                     if (VBCodes.size() >= 1){
-                        result = 1 + result;
+                        result = 128 | result;
                     }
-                    else {
-                        result = 0 + result;
-                    }
+
                     VBCodes.add(result);
-                    result = "";
+                    result = 0;
+                    t = 0;
                 }
             }
 
-            if (VBCodes.size() >= 1 && !result.equals("")){
-                StringBuilder zeros = new StringBuilder();
-                for (int k = 0; k < 7-result.length(); k++){
-                    zeros.append("0");
-                }
-                result = 1 + zeros.toString() + result;
+            if (VBCodes.size() >= 1 && result != 0){
+                result = 128 | result;
                 VBCodes.add(result);
             }
-            else if (VBCodes.size() == 0 && !result.equals("")){
-                StringBuilder zeros = new StringBuilder();
-                for (int l = 0; l < 7-result.length(); l++){
-                    zeros.append("0");
-                }
-                result = 0 + zeros.toString() + result;
+            else if (VBCodes.size() == 0 && result != 0){
                 VBCodes.add(result);
             }
 
             for (int m = VBCodes.size()-1; m >= 0; m--){
-                Integer s = Integer.parseInt(VBCodes.get(m), 2);
-                byte temp = s.byteValue();
+                int num = VBCodes.get(m);
+                byte temp = (byte) num;
                 finalResult.add(temp);
             }
         }
@@ -100,29 +92,32 @@ public class DeltaVarLenCompressor implements Compressor {
             codes[i-start] = bytes[i];
         }
 
-        List<String> temp = new ArrayList<>();
-        for (int j = 0; j < codes.length; j++){
-            String code = String.format("%8s", Integer.toBinaryString(codes[j] & 0xFF)).replace(' ', '0');
-            temp.add(code);
-        }
+        List<List<Byte>> binaryCodes= new ArrayList<>();
+        Integer sum = 0;
 
-        List<String> key = new ArrayList<>();
+        for (int j = 0; j < codes.length; j++) {
+            List<Byte> binaryCode = new ArrayList<>();
 
-        for (String str : temp) {
-            if (!str.startsWith("0")){
-                key.add(str);
-                continue;
-            }
-            key.add(str);
-
-            String result = String.valueOf(Integer.valueOf(key.get(0).substring(1)));
-
-            for (int k = 1; k < key.size(); k++){
-                result = result.concat(key.get(k).substring(1));
+            for (int k = 0; k < 8; k++) {
+                binaryCode.add((byte) (codes[j] & 1));
+                codes[j] = (byte) (codes[j] >> 1);
             }
 
-            results.add(Integer.parseInt(result, 2));
-            key.clear();
+            binaryCodes.add(binaryCode);
+
+            if (binaryCode.get(7) == 0){
+                for (int m = 0; m < binaryCodes.size(); m++){
+                    for (int n = 0; n < 7; n++){
+                        if (binaryCodes.get(m).get(n) == 1){
+                            sum += (int) Math.pow(2, 7*(binaryCodes.size()-1-m)+n);
+                        }
+                    }
+                }
+
+                results.add(sum);
+                sum = 0;
+                binaryCodes.clear();
+            }
         }
 
         for (int l = 1; l < results.size(); l++){

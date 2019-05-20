@@ -71,5 +71,9 @@ public class AutoFlushBuffer {
     int getOffset() {
         return offset;
     }
+
+    int getRID() {
+        return pageId * PAGE_SIZE + offset;
+    }
 }
 
