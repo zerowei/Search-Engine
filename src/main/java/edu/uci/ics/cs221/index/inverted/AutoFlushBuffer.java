@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 
 import static edu.uci.ics.cs221.index.inverted.PageFileChannel.PAGE_SIZE;
 
-public class AutoFlushBuffer {
+public class AutoFlushBuffer implements AutoCloseable {
     ByteBuffer buffer;
     PageFileChannel file;
     int pageId, offset;
@@ -74,6 +74,10 @@ public class AutoFlushBuffer {
 
     int getRID() {
         return pageId * PAGE_SIZE + offset;
+    }
+
+    @Override public void close() throws Exception {
+        file.close();
     }
 }
 
