@@ -8,7 +8,6 @@ import edu.uci.ics.cs221.analysis.*;
 import edu.uci.ics.cs221.storage.Document;
 import edu.uci.ics.cs221.storage.DocumentStore;
 import edu.uci.ics.cs221.storage.MapdbDocStore;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.File;
 import java.io.IOException;
@@ -418,7 +417,7 @@ public class InvertedIndexManager {
 
             // In case that the same keyword is searched multiple times, for example, "cat cat cat" is searched as a phrase,
             // then the iterator shouldn't move to the next keyword until search something rather than "cat"
-            final docListRID nulldocListRID = new docListRID(null, new ArrayList<>(), new byte[0]);
+            final docListRID nulldocListRID = new docListRID(null, new ArrayList<>(), new ArrayList<>());
 
             if (!hasNext() || keywords.isEmpty()) {
                 return nulldocListRID;
@@ -453,14 +452,14 @@ public class InvertedIndexManager {
 
             List<Integer> documentIdList = compressor.decode(encodedDocumentIds);
             // Not used in sequential reading
-            //List<Integer> positionRidList = compressor.decode(encodedPositionRIDs);
+            List<Integer> positionRidList = compressor.decode(encodedPositionRIDs);
             docListRID docRID;
             // Maybe we need to return positionRidList rather than the entire positionList due to memory limit?
             if (!includePosition){
                 docRID = new docListRID(keywordList.get(currentKeywordId), documentIdList);
             }
             else {
-                docRID = new docListRID(keywordList.get(currentKeywordId), documentIdList, encodedPositionRIDs);
+                docRID = new docListRID(keywordList.get(currentKeywordId), documentIdList, positionRidList);
             }
 
             return docRID;
@@ -688,7 +687,7 @@ public class InvertedIndexManager {
 
         for (int i = 0; i < getNumSegments(); i++) {
             InvertedIndexIterator itr = new InvertedIndexIterator(i, compressor);
-            Set<Integer> documentIds = new HashSet<>(itr.next(Arrays.asList(keyword), false).docIds);
+            Set<Integer> documentIds = new HashSet<>(itr.next(Arrays.asList(keyword), false).docIdList);
 
             if (documentIds.isEmpty()){
                 return Collections.emptyIterator();
@@ -742,7 +741,7 @@ public class InvertedIndexManager {
             InvertedIndexIterator itr = new InvertedIndexIterator(i, compressor);
             List<String> copy = new ArrayList<>(words);
 
-            Set<Integer> intersection = new HashSet<>(itr.next(copy, false).docIds);
+            Set<Integer> intersection = new HashSet<>(itr.next(copy, false).docIdList);
 
             if (intersection.isEmpty()){
                 try {
@@ -757,7 +756,7 @@ public class InvertedIndexManager {
             copy.remove(0);
 
             for (int j = 1; j < length; j++){
-                intersection.retainAll(itr.next(copy, false).docIds);
+                intersection.retainAll(itr.next(copy, false).docIdList);
                 copy.remove(0);
                 if (intersection.isEmpty()){
                     break;
@@ -824,7 +823,7 @@ public class InvertedIndexManager {
 
         for (int i = 0; i < getNumSegments(); i++) {
             InvertedIndexIterator itr = new InvertedIndexIterator(i, compressor);
-            Set<Integer> union = new HashSet<>(itr.next(copy, false).docIds);
+            Set<Integer> union = new HashSet<>(itr.next(copy, false).docIdList);
 
             if (union.isEmpty()){
                 try {
@@ -838,7 +837,7 @@ public class InvertedIndexManager {
             copy.remove(0);
 
             for (int j = 1; j < length; j++){
-                union.addAll(itr.next(copy, false).docIds);
+                union.addAll(itr.next(copy, false).docIdList);
                 copy.remove(0);
             }
 
@@ -950,15 +949,18 @@ public class InvertedIndexManager {
         int length = OrderdPhrase.size();
         Compressor compressor = new DeltaVarLenCompressor();
 
-        for (int j = 0; j < numSegments; j++){
-            InvertedIndexIterator itr = new InvertedIndexIterator(j, compressor);
+        for (int segmentId = 0; segmentId < numSegments; segmentId++) {
+            InvertedIndexIterator itr = new InvertedIndexIterator(segmentId, compressor);
 
             List<docListRID> totalListRID = new ArrayList<>();
             List<String> tokens = new ArrayList<>(OrderdPhrase.keySet());
 
             for (int k = 0; k < length; k++){
                 docListRID docRID = itr.next(tokens, true);
-                if (docRID.docIds.isEmpty()){
+                if (docRID.docIdList.isEmpty()){
+                    // If the iterator is implemented correctly,
+                    // then this branch means one or more keywords are not found in the current segment, right?
+                    // Should we return a null iterator after closing all the files here?
                     break;
                 }
                 totalListRID.add(docRID);
@@ -978,21 +980,21 @@ public class InvertedIndexManager {
 
             PageFileChannel positionFileChannel = PageFileChannel.createOrOpen(
                     Paths.get(
-                            getPositionFilePathString(j)
+                            getPositionFilePathString(segmentId)
                     ));
             AutoLoadBuffer positionFileBuffer = new AutoLoadBuffer(positionFileChannel);
-            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(j));
+            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segmentId));
 
             int record4Byte = 0;
 
-            for (int l = 0; l < totalListRID.get(0).docIds.size(); l++){
+            for (int l = 0; l < totalListRID.get(0).docIdList.size(); l++){
                 Integer docID4firstWord = totalListRID.get(0).docIds.get(l);
 
                 List<Byte> encodedPositionRID = new ArrayList<>();
                 final byte mask = (byte) (1 << 7);
                 byte b = mask;
                 while ((b & mask) != 0) {
-                    b = totalListRID.get(0).encodedPositionRIDs[record4Byte];
+                    b = totalListRID.get(0).positionRIDs[record4Byte];
                     encodedPositionRID.add(b);
                     record4Byte++;
                 }
@@ -1029,14 +1031,14 @@ public class InvertedIndexManager {
                     for (int n = 0; n <= index-1; n++) {
                         b = mask;
                         while ((b & mask) != 0) {
-                            b = totalListRID.get(m).encodedPositionRIDs[record4Others];
+                            b = totalListRID.get(m).positionRIDs[record4Others];
                             record4Others++;
                         }
                     }
 
                     b = mask;
                     while ((b & mask) != 0) {
-                        b = totalListRID.get(m).encodedPositionRIDs[record4Others];
+                        b = totalListRID.get(m).positionRIDs[record4Others];
                         System.out.println(b);
                         encodedRID.add(b);
                         record4Others++;

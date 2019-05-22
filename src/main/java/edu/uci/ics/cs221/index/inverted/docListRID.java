@@ -4,24 +4,25 @@ import java.util.List;
 
 public class docListRID {
     String keyword;
-    List<Integer> docIds;
-    byte[] encodedPositionRIDs;
+    List<Integer> docIdList;
+    List<Integer> positionRidList;
 
     docListRID(String keyword, List<Integer> docIds){
         this.keyword = keyword;
-        this.docIds = docIds;
+        this.docIdList = docIds;
     }
 
-    docListRID(String keyword, List<Integer> docIds, byte[] encodedPositionRIDs){
+    docListRID(String keyword, List<Integer> docIdList, List<Integer> positionRidList){
         this.keyword = keyword;
-        this.docIds = docIds;
-        this.encodedPositionRIDs = encodedPositionRIDs;
+        this.docIdList = docIdList;
+        this.positionRidList = positionRidList;
     }
 
     @Override public String toString() {
         return "docListRID{" +
                 "keyword: " + keyword +
-                ", docIds: " + docIds;
+                ", docIds: " + docIdList +
+                ", positionRIDs: " + positionRidList;
     }
 
 }
