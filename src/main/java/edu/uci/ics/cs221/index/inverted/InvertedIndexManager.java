@@ -414,7 +414,7 @@ public class InvertedIndexManager {
         }
 
         // Find the next index that matches the keyword
-        public docListRID next(List<String> keywords) {
+        public docListRID next(List<String> keywords, boolean includePosition) {
 
             // In case that the same keyword is searched multiple times, for example, "cat cat cat" is searched as a phrase,
             // then the iterator shouldn't move to the next keyword until search something rather than "cat"
@@ -454,9 +454,15 @@ public class InvertedIndexManager {
             List<Integer> documentIdList = compressor.decode(encodedDocumentIds);
             // Not used in sequential reading
             //List<Integer> positionRidList = compressor.decode(encodedPositionRIDs);
-
+            docListRID docRID;
             // Maybe we need to return positionRidList rather than the entire positionList due to memory limit?
-            docListRID docRID = new docListRID(keywordList.get(currentKeywordId), documentIdList, encodedPositionRIDs);
+            if (!includePosition){
+                docRID = new docListRID(keywordList.get(currentKeywordId), documentIdList);
+            }
+            else {
+                docRID = new docListRID(keywordList.get(currentKeywordId), documentIdList, encodedPositionRIDs);
+            }
+
             return docRID;
 
         }
@@ -682,7 +688,7 @@ public class InvertedIndexManager {
 
         for (int i = 0; i < getNumSegments(); i++) {
             InvertedIndexIterator itr = new InvertedIndexIterator(i, compressor);
-            Set<Integer> documentIds = new HashSet<>(itr.next(Arrays.asList(keyword)).docIds);
+            Set<Integer> documentIds = new HashSet<>(itr.next(Arrays.asList(keyword), false).docIds);
 
             if (documentIds.isEmpty()){
                 return Collections.emptyIterator();
@@ -736,7 +742,7 @@ public class InvertedIndexManager {
             InvertedIndexIterator itr = new InvertedIndexIterator(i, compressor);
             List<String> copy = new ArrayList<>(words);
 
-            Set<Integer> intersection = new HashSet<>(itr.next(copy).docIds);
+            Set<Integer> intersection = new HashSet<>(itr.next(copy, false).docIds);
 
             if (intersection.isEmpty()){
                 try {
@@ -751,7 +757,7 @@ public class InvertedIndexManager {
             copy.remove(0);
 
             for (int j = 1; j < length; j++){
-                intersection.retainAll(itr.next(copy).docIds);
+                intersection.retainAll(itr.next(copy, false).docIds);
                 copy.remove(0);
                 if (intersection.isEmpty()){
                     break;
@@ -818,7 +824,7 @@ public class InvertedIndexManager {
 
         for (int i = 0; i < getNumSegments(); i++) {
             InvertedIndexIterator itr = new InvertedIndexIterator(i, compressor);
-            Set<Integer> union = new HashSet<>(itr.next(copy).docIds);
+            Set<Integer> union = new HashSet<>(itr.next(copy, false).docIds);
 
             if (union.isEmpty()){
                 try {
@@ -832,7 +838,7 @@ public class InvertedIndexManager {
             copy.remove(0);
 
             for (int j = 1; j < length; j++){
-                union.addAll(itr.next(copy).docIds);
+                union.addAll(itr.next(copy, false).docIds);
                 copy.remove(0);
             }
 
@@ -914,7 +920,7 @@ public class InvertedIndexManager {
      */
 
     public Iterator<Document> searchPhraseQuery(List<String> phrase) {
-        /*
+
         Preconditions.checkNotNull(phrase);
 
         if (!flag){
@@ -941,71 +947,139 @@ public class InvertedIndexManager {
             order++;
         }
 
+        int length = OrderdPhrase.size();
+        Compressor compressor = new DeltaVarLenCompressor();
+
         for (int j = 0; j < numSegments; j++){
             InvertedIndexIterator itr = new InvertedIndexIterator(j, compressor);
 
+            List<docListRID> totalListRID = new ArrayList<>();
             List<String> tokens = new ArrayList<>(OrderdPhrase.keySet());
-            String firstKeyword = tokens.get(0);
-            Set<Integer> intersection = new HashSet<>(itr.next(Arrays.asList(firstKeyword)).docPositions.keySet());
 
-            if (intersection.isEmpty()){
-                try {
-                    itr.close();
-                } catch (Exception e) {
-                    System.out.println("error closing iterator");
-                }
-                continue;
-            }
-
-            for (int k = 1; k < tokens.size(); k++){
-                intersection.retainAll(itr.next(Arrays.asList(tokens.get(k))).docPositions.keySet());
-                if (intersection.isEmpty()){
+            for (int k = 0; k < length; k++){
+                docListRID docRID = itr.next(tokens, true);
+                if (docRID.docIds.isEmpty()){
                     break;
                 }
-            }
-            if (intersection.isEmpty()){
-                try {
-                    itr.close();
-                } catch (Exception e) {
-                    System.out.println("error closing iterator");
-                }
-                continue;
+                totalListRID.add(docRID);
+                tokens.remove(0);
             }
 
-            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(j));
-
-            for (Integer integer: intersection){
-                InvertedIndexIterator newItr = new InvertedIndexIterator(j, compressor);
-                List<Integer> position4Firstword = newItr.next(Arrays.asList(firstKeyword)).docPositions.get(integer);
-
-                for (int l = 1; l < tokens.size(); l++){
-                    int subtract = OrderdPhrase.get(tokens.get(l)) - OrderdPhrase.get(tokens.get(l-1));
-
-                    for (int m = 0; m < position4Firstword.size(); m++){
-                        int newPosition = position4Firstword.get(m)+subtract;
-                        position4Firstword.set(m, newPosition);
-                    }
-
-                    position4Firstword.retainAll(newItr.next(Arrays.asList(tokens.get(l))).docPositions.get(integer));
-
-
-                }
-                if (!position4Firstword.isEmpty()){
-                    finalResults.add(documentStore.getDocument(integer));
-                }
-            }
-            documentStore.close();
+            tokens.addAll(OrderdPhrase.keySet());
             try {
                 itr.close();
             } catch (Exception e) {
-                System.out.println("error closing iterator");
+                e.printStackTrace();
             }
+
+            if (totalListRID.size() != tokens.size()){
+                continue;
+            }
+
+            PageFileChannel positionFileChannel = PageFileChannel.createOrOpen(
+                    Paths.get(
+                            getPositionFilePathString(j)
+                    ));
+            AutoLoadBuffer positionFileBuffer = new AutoLoadBuffer(positionFileChannel);
+            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(j));
+
+            int record4Byte = 0;
+
+            for (int l = 0; l < totalListRID.get(0).docIds.size(); l++){
+                Integer docID4firstWord = totalListRID.get(0).docIds.get(l);
+
+                List<Byte> encodedPositionRID = new ArrayList<>();
+                final byte mask = (byte) (1 << 7);
+                byte b = mask;
+                while ((b & mask) != 0) {
+                    b = totalListRID.get(0).encodedPositionRIDs[record4Byte];
+                    encodedPositionRID.add(b);
+                    record4Byte++;
+                }
+                int positionRID = compressor.decode(Bytes.toArray(encodedPositionRID)).get(0);
+
+                int pageID = positionRID / PAGE_SIZE;
+                int offset = positionRID % PAGE_SIZE;
+                positionFileBuffer.setPageIdAndOffset(pageID, offset);
+
+                List<Byte> lengthPositionBytes = new ArrayList<>();
+                b = mask;
+                while ((b & mask) != 0) {
+                    b = positionFileBuffer.getByte();
+                    lengthPositionBytes.add(b);
+                }
+                int lengthPosition = compressor.decode(Bytes.toArray(lengthPositionBytes)).get(0);
+                byte[] encodedPositions = positionFileBuffer.getByteArray(lengthPosition);
+                List<Integer> intersection = compressor.decode(encodedPositions);
+                if (intersection.isEmpty()){
+                    continue;
+                }
+
+                int record = 1;
+                for (int m = 1; m < totalListRID.size(); m++){
+                    if (!totalListRID.get(m).docIds.contains(docID4firstWord)){
+                        break;
+                    }
+                    record++;
+                    int index = totalListRID.get(m).docIds.indexOf(docID4firstWord);
+                    System.out.println(index);
+
+                    List<Byte> encodedRID = new ArrayList<>();
+                    int record4Others = 0;
+                    for (int n = 0; n <= index-1; n++) {
+                        b = mask;
+                        while ((b & mask) != 0) {
+                            b = totalListRID.get(m).encodedPositionRIDs[record4Others];
+                            record4Others++;
+                        }
+                    }
+
+                    b = mask;
+                    while ((b & mask) != 0) {
+                        b = totalListRID.get(m).encodedPositionRIDs[record4Others];
+                        System.out.println(b);
+                        encodedRID.add(b);
+                        record4Others++;
+                    }
+                    System.out.println(encodedRID);
+                    System.out.println(compressor.decode(Bytes.toArray(encodedRID)));
+                    int decodedRID = compressor.decode(Bytes.toArray(encodedRID)).get(0);
+
+                    int pageID4Others = decodedRID / PAGE_SIZE;
+                    int offset4Others = decodedRID % PAGE_SIZE;
+                    positionFileBuffer.setPageIdAndOffset(pageID4Others, offset4Others);
+
+                    List<Byte> lengthPositionBytes4Others = new ArrayList<>();
+                    b = mask;
+                    while ((b & mask) != 0) {
+                        b = positionFileBuffer.getByte();
+                        lengthPositionBytes4Others.add(b);
+                    }
+                    int lengthPosition4Others = compressor.decode(Bytes.toArray(lengthPositionBytes4Others)).get(0);
+                    byte[] encodedPositions4Others = positionFileBuffer.getByteArray(lengthPosition4Others);
+
+                    int subtract = OrderdPhrase.get(tokens.get(m)) - OrderdPhrase.get(tokens.get(0));
+                    for (int p = 0; p < intersection.size(); p++){
+                        int newPosition = intersection.get(p)+subtract;
+                        intersection.set(p, newPosition);
+                    }
+                    intersection.retainAll(compressor.decode(encodedPositions4Others));
+                    if (intersection.isEmpty()){
+                        break;
+                    }
+                }
+
+                if (record == totalListRID.size() && !intersection.isEmpty()){
+                    finalResults.add(documentStore.getDocument(docID4firstWord));
+                }
+            }
+
+            documentStore.close();
+            positionFileChannel.close();
         }
+        System.out.println(finalResults);
 
         return finalResults.iterator();
-
-         */
-        throw new NotImplementedException();
     }
 
     /**

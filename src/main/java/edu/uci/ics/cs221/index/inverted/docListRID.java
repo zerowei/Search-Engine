@@ -7,6 +7,11 @@ public class docListRID {
     List<Integer> docIds;
     byte[] encodedPositionRIDs;
 
+    docListRID(String keyword, List<Integer> docIds){
+        this.keyword = keyword;
+        this.docIds = docIds;
+    }
+
     docListRID(String keyword, List<Integer> docIds, byte[] encodedPositionRIDs){
         this.keyword = keyword;
         this.docIds = docIds;
