@@ -451,6 +451,7 @@ public class InvertedIndexManager {
             byte[] encodedPositionRIDs = segmentFileBuffer.getByteArray(lengthPositionRIDs);
 
             List<Integer> documentIdList = compressor.decode(encodedDocumentIds);
+            System.out.println(documentIdList);
             // Not used in sequential reading
             List<Integer> positionRidList = compressor.decode(encodedPositionRIDs);
             docListRID docRID;
@@ -947,7 +948,6 @@ public class InvertedIndexManager {
         }
 
         int length = OrderdPhrase.size();
-        Compressor compressor = new DeltaVarLenCompressor();
 
         for (int segmentId = 0; segmentId < numSegments; segmentId++) {
             InvertedIndexIterator itr = new InvertedIndexIterator(segmentId, compressor);
@@ -977,7 +977,7 @@ public class InvertedIndexManager {
             if (totalListRID.size() != tokens.size()){
                 continue;
             }
-            System.out.println(totalListRID);
+
             PageFileChannel positionFileChannel = PageFileChannel.createOrOpen(
                     Paths.get(
                             getPositionFilePathString(segmentId)
@@ -994,17 +994,24 @@ public class InvertedIndexManager {
                 int offset = positionRID % PAGE_SIZE;
                 positionFileBuffer.setPageIdAndOffset(pageID, offset);
 
-                List<Byte> lengthPositionBytes = new ArrayList<>();
-
+                int lengthPosition;
                 final byte mask = (byte) (1 << 7);
                 byte b = mask;
-                while ((b & mask) != 0) {
-                    b = positionFileBuffer.getByte();
-                    lengthPositionBytes.add(b);
+
+                if (compressor instanceof NaiveCompressor) {
+                    lengthPosition = positionFileBuffer.getInt();
+                } else {
+                    List<Byte> lengthPositionBytes = new ArrayList<>();
+                    while ((b & mask) != 0) {
+                        b = positionFileBuffer.getByte();
+                        lengthPositionBytes.add(b);
+                    }
+                    lengthPosition = compressor.decode(Bytes.toArray(lengthPositionBytes)).get(0);
                 }
-                int lengthPosition = compressor.decode(Bytes.toArray(lengthPositionBytes)).get(0);
+
                 byte[] encodedPositions = positionFileBuffer.getByteArray(lengthPosition);
                 List<Integer> intersection = compressor.decode(encodedPositions);
+
                 if (intersection.isEmpty()){
                     continue;
                 }
@@ -1024,22 +1031,28 @@ public class InvertedIndexManager {
                     int offset4Others = decodedRID % PAGE_SIZE;
                     positionFileBuffer.setPageIdAndOffset(pageID4Others, offset4Others);
 
-                    List<Byte> lengthPositionBytes4Others = new ArrayList<>();
+                    int lengthPosition4Others;
                     b = mask;
-                    while ((b & mask) != 0) {
-                        b = positionFileBuffer.getByte();
-                        lengthPositionBytes4Others.add(b);
+                    if (compressor instanceof NaiveCompressor) {
+                        lengthPosition4Others = positionFileBuffer.getInt();
                     }
-                    int lengthPosition4Others = compressor.decode(Bytes.toArray(lengthPositionBytes4Others)).get(0);
+                    else {
+                        List<Byte> lengthPositionBytes4Others = new ArrayList<>();
+                        while ((b & mask) != 0) {
+                            b = positionFileBuffer.getByte();
+                            lengthPositionBytes4Others.add(b);
+                        }
+                        lengthPosition4Others = compressor.decode(Bytes.toArray(lengthPositionBytes4Others)).get(0);
+                    }
+
                     byte[] encodedPositions4Others = positionFileBuffer.getByteArray(lengthPosition4Others);
-                    System.out.println(intersection);
+
                     int subtract = OrderdPhrase.get(tokens.get(m)) - OrderdPhrase.get(tokens.get(m-1));
                     for (int p = 0; p < intersection.size(); p++){
                         int newPosition = intersection.get(p)+subtract;
                         intersection.set(p, newPosition);
                     }
-                    System.out.println(intersection);
-                    System.out.println(compressor.decode(encodedPositions4Others));
+
                     intersection.retainAll(compressor.decode(encodedPositions4Others));
                     if (intersection.isEmpty()){
                         break;
@@ -1054,7 +1067,6 @@ public class InvertedIndexManager {
             documentStore.close();
             positionFileChannel.close();
         }
-        System.out.println(finalResults);
 
         return finalResults.iterator();
     }
