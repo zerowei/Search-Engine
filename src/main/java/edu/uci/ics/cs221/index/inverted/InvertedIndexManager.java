@@ -1033,11 +1033,12 @@ public class InvertedIndexManager {
                     int lengthPosition4Others = compressor.decode(Bytes.toArray(lengthPositionBytes4Others)).get(0);
                     byte[] encodedPositions4Others = positionFileBuffer.getByteArray(lengthPosition4Others);
                     System.out.println(intersection);
-                    int subtract = OrderdPhrase.get(tokens.get(m)) - OrderdPhrase.get(tokens.get(0));
+                    int subtract = OrderdPhrase.get(tokens.get(m)) - OrderdPhrase.get(tokens.get(m-1));
                     for (int p = 0; p < intersection.size(); p++){
                         int newPosition = intersection.get(p)+subtract;
                         intersection.set(p, newPosition);
                     }
+                    System.out.println(intersection);
                     System.out.println(compressor.decode(encodedPositions4Others));
                     intersection.retainAll(compressor.decode(encodedPositions4Others));
                     if (intersection.isEmpty()){
