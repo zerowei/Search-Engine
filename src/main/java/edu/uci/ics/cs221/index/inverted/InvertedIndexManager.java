@@ -451,8 +451,6 @@ public class InvertedIndexManager {
             byte[] encodedPositionRIDs = segmentFileBuffer.getByteArray(lengthPositionRIDs);
 
             List<Integer> documentIdList = compressor.decode(encodedDocumentIds);
-            System.out.println(documentIdList);
-            // Not used in sequential reading
             List<Integer> positionRidList = compressor.decode(encodedPositionRIDs);
             docListRID docRID;
             // Maybe we need to return positionRidList rather than the entire positionList due to memory limit?
@@ -691,7 +689,13 @@ public class InvertedIndexManager {
             Set<Integer> documentIds = new HashSet<>(itr.next(Arrays.asList(keyword), false).docIdList);
 
             if (documentIds.isEmpty()){
-                return Collections.emptyIterator();
+                try {
+                    itr.close();
+                }
+                catch (Exception e){
+                    e.printStackTrace();
+                }
+                continue;
             }
 
             DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(i));
