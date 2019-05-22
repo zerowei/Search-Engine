@@ -977,7 +977,7 @@ public class InvertedIndexManager {
             if (totalListRID.size() != tokens.size()){
                 continue;
             }
-
+            System.out.println(totalListRID);
             PageFileChannel positionFileChannel = PageFileChannel.createOrOpen(
                     Paths.get(
                             getPositionFilePathString(segmentId)
@@ -985,27 +985,19 @@ public class InvertedIndexManager {
             AutoLoadBuffer positionFileBuffer = new AutoLoadBuffer(positionFileChannel);
             DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segmentId));
 
-            int record4Byte = 0;
-
             for (int l = 0; l < totalListRID.get(0).docIdList.size(); l++){
-                Integer docID4firstWord = totalListRID.get(0).docIds.get(l);
+                Integer docID4firstWord = totalListRID.get(0).docIdList.get(l);
 
-                List<Byte> encodedPositionRID = new ArrayList<>();
-                final byte mask = (byte) (1 << 7);
-                byte b = mask;
-                while ((b & mask) != 0) {
-                    b = totalListRID.get(0).positionRIDs[record4Byte];
-                    encodedPositionRID.add(b);
-                    record4Byte++;
-                }
-                int positionRID = compressor.decode(Bytes.toArray(encodedPositionRID)).get(0);
+                int positionRID = totalListRID.get(0).positionRidList.get(l);
 
                 int pageID = positionRID / PAGE_SIZE;
                 int offset = positionRID % PAGE_SIZE;
                 positionFileBuffer.setPageIdAndOffset(pageID, offset);
 
                 List<Byte> lengthPositionBytes = new ArrayList<>();
-                b = mask;
+
+                final byte mask = (byte) (1 << 7);
+                byte b = mask;
                 while ((b & mask) != 0) {
                     b = positionFileBuffer.getByte();
                     lengthPositionBytes.add(b);
@@ -1018,34 +1010,15 @@ public class InvertedIndexManager {
                 }
 
                 int record = 1;
+
                 for (int m = 1; m < totalListRID.size(); m++){
-                    if (!totalListRID.get(m).docIds.contains(docID4firstWord)){
+                    if (!totalListRID.get(m).docIdList.contains(docID4firstWord)){
                         break;
                     }
+
                     record++;
-                    int index = totalListRID.get(m).docIds.indexOf(docID4firstWord);
-                    System.out.println(index);
-
-                    List<Byte> encodedRID = new ArrayList<>();
-                    int record4Others = 0;
-                    for (int n = 0; n <= index-1; n++) {
-                        b = mask;
-                        while ((b & mask) != 0) {
-                            b = totalListRID.get(m).positionRIDs[record4Others];
-                            record4Others++;
-                        }
-                    }
-
-                    b = mask;
-                    while ((b & mask) != 0) {
-                        b = totalListRID.get(m).positionRIDs[record4Others];
-                        System.out.println(b);
-                        encodedRID.add(b);
-                        record4Others++;
-                    }
-                    System.out.println(encodedRID);
-                    System.out.println(compressor.decode(Bytes.toArray(encodedRID)));
-                    int decodedRID = compressor.decode(Bytes.toArray(encodedRID)).get(0);
+                    int index = totalListRID.get(m).docIdList.indexOf(docID4firstWord);
+                    int decodedRID = totalListRID.get(m).positionRidList.get(index);
 
                     int pageID4Others = decodedRID / PAGE_SIZE;
                     int offset4Others = decodedRID % PAGE_SIZE;
@@ -1059,12 +1032,13 @@ public class InvertedIndexManager {
                     }
                     int lengthPosition4Others = compressor.decode(Bytes.toArray(lengthPositionBytes4Others)).get(0);
                     byte[] encodedPositions4Others = positionFileBuffer.getByteArray(lengthPosition4Others);
-
+                    System.out.println(intersection);
                     int subtract = OrderdPhrase.get(tokens.get(m)) - OrderdPhrase.get(tokens.get(0));
                     for (int p = 0; p < intersection.size(); p++){
                         int newPosition = intersection.get(p)+subtract;
                         intersection.set(p, newPosition);
                     }
+                    System.out.println(compressor.decode(encodedPositions4Others));
                     intersection.retainAll(compressor.decode(encodedPositions4Others));
                     if (intersection.isEmpty()){
                         break;
