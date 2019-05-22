@@ -102,6 +102,10 @@ public class Team6IndexCompressionTest {
             compressManager.searchPhraseQuery(keywords);
         compressReadCounter = PageFileChannel.readCounter;
         PageFileChannel.resetCounters();
+
+        System.out.println("READ " + compressReadCounter/nonCompressReadCounter);
+        System.out.println("WRITE " + compressWriteCounter/nonCompressWriteCounter);
+
         assertEquals(true, compressReadCounter/nonCompressReadCounter < (double)2/3);
 
         assertEquals(true, compressWriteCounter/nonCompressWriteCounter < (double)2/3);
