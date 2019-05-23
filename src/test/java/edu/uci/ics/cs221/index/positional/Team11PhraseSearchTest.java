@@ -9,15 +9,14 @@ import edu.uci.ics.cs221.index.inverted.Compressor;
 import edu.uci.ics.cs221.index.inverted.DeltaVarLenCompressor;
 import edu.uci.ics.cs221.storage.Document;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 
 public class Team11PhraseSearchTest {
@@ -68,17 +67,22 @@ public class Team11PhraseSearchTest {
     }
 
     /*
-    * Test1 tests an easy case with only 1 segment and it has 1 document. We test if we
-    * can get the right result.
-    **/
+     * Test1 tests an easy case with only 1 segment and it has 1 document. We test if we
+     * can get the right result.
+     **/
     @Test
     public void PhraseSearchTest1(){
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1;
         index.addDocument(documents[0]);
+
+        Set<Document> expected = new HashSet<>(Arrays.asList(documents[0]));
+        Set<Document> actual = new HashSet<>();
+
         Iterator<Document> itr = index.searchPhraseQuery(Arrays.asList("eat", "beforehand"));
         while (itr.hasNext()){
-            assertEquals(itr.next(), documents[0]);
+            actual.add(itr.next());
         }
+        Assert.assertEquals(expected, actual);
     }
 
     /*
@@ -91,12 +95,15 @@ public class Team11PhraseSearchTest {
         for (Document doc : documents){
             index.addDocument(doc);
         }
-        int i = 0;
-        List<Document> expectedDocuments = Arrays.asList(documents[1], documents[3]);
+
+        Set<Document> expected = new HashSet<>(Arrays.asList(documents[1], documents[3]));
+        Set<Document> actual = new HashSet<>();
+
         Iterator<Document> itr = index.searchPhraseQuery(Arrays.asList("Summer", "Pizza", "House"));
         while (itr.hasNext()){
-            assertEquals(itr.next(), expectedDocuments.get(i++));
+            actual.add(itr.next());
         }
+        Assert.assertEquals(expected, actual);
     }
 
     /*
@@ -109,12 +116,15 @@ public class Team11PhraseSearchTest {
         for (Document doc : documents){
             index.addDocument(doc);
         }
-        int i = 0;
-        List<Document> expectedDocuments = Arrays.asList(documents[0], documents[2], documents[6]);
+
+        Set<Document> expected = new HashSet<>(Arrays.asList(documents[0], documents[2], documents[6]));
+        Set<Document> actual = new HashSet<>();
+
         Iterator<Document> itr = index.searchPhraseQuery(Arrays.asList("good", "idea"));
         while (itr.hasNext()){
-            assertEquals(itr.next(), expectedDocuments.get(i++));
+            actual.add(itr.next());
         }
+        Assert.assertEquals(expected, actual);
     }
 
     /*

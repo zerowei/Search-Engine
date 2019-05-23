@@ -80,7 +80,6 @@ public class PageFileChannel implements AutoCloseable {
      * @return a ByteBuffer including the byte array of the
      */
     public ByteBuffer readPage(int pageNum) {
-        System.out.println("reading page " + pageNum);
         try {
             readCounter++;
             ByteBuffer buffer = ByteBuffer.allocate(PAGE_SIZE);
