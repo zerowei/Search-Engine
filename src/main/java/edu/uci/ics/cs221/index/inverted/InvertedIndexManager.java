@@ -745,8 +745,7 @@ public class InvertedIndexManager {
             // System.out.println("----------Segment Num " + i);
             InvertedIndexIterator itr = new InvertedIndexIterator(i, compressor);
             List<String> copy = new ArrayList<>(words);
-
-            Set<Integer> intersection = new HashSet<>(itr.next(copy, false).docIdList);
+            Set<Integer> intersection = new HashSet<>(itr.next(Arrays.asList(copy.get(0)), false).docIdList);
 
             if (intersection.isEmpty()){
                 try {
@@ -761,7 +760,8 @@ public class InvertedIndexManager {
             copy.remove(0);
 
             for (int j = 1; j < length; j++){
-                intersection.retainAll(itr.next(copy, false).docIdList);
+                intersection.retainAll(itr.next(Arrays.asList(copy.get(0)), false).docIdList);
+                System.out.println(intersection);
                 copy.remove(0);
                 if (intersection.isEmpty()){
                     break;
@@ -795,6 +795,7 @@ public class InvertedIndexManager {
             }
 
         }
+
         return results.iterator();
         // throw new UnsupportedOperationException();
     }
