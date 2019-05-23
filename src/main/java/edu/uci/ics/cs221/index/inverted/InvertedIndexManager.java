@@ -761,7 +761,6 @@ public class InvertedIndexManager {
 
             for (int j = 1; j < length; j++){
                 intersection.retainAll(itr.next(Arrays.asList(copy.get(0)), false).docIdList);
-                System.out.println(intersection);
                 copy.remove(0);
                 if (intersection.isEmpty()){
                     break;
