@@ -825,10 +825,11 @@ public class InvertedIndexManager {
         }
 
         Collections.sort(words);
-        int length = words.size();
-        List<String> copy = new ArrayList<>(words);
 
         for (int i = 0; i < getNumSegments(); i++) {
+            int length = words.size();
+            List<String> copy = new ArrayList<>(words);
+
             InvertedIndexIterator itr = new InvertedIndexIterator(i, compressor);
             Set<Integer> union = new HashSet<>(itr.next(copy, false).docIdList);
 
@@ -841,11 +842,18 @@ public class InvertedIndexManager {
                 }
                 continue;
             }
-            copy.remove(0);
 
-            for (int j = 1; j < length; j++){
+            int index = copy.indexOf(itr.keywordList.get(itr.currentKeywordId));
+            copy.subList(0, index + 1).clear();
+            length -= (index + 1);
+
+            while (length > 0){
                 union.addAll(itr.next(copy, false).docIdList);
-                copy.remove(0);
+                if (itr.currentKeywordId == itr.cacheId)
+                    break;
+                index = copy.indexOf(itr.keywordList.get(itr.currentKeywordId));
+                copy.subList(0, index + 1).clear();
+                length -= (index + 1);
             }
 
             if (union.isEmpty()){
@@ -862,9 +870,7 @@ public class InvertedIndexManager {
             for (Integer e : union){
                 results.add(documentStore.getDocument(e));
             }
-
             documentStore.close();
-            copy.addAll(words);
 
             try {
                 itr.close();
@@ -1093,14 +1099,14 @@ public class InvertedIndexManager {
      * @return a iterator of top-k ordered documents matching the query
      */
     public Iterator<Pair<Document, Double>> searchTfIdf(List<String> keywords, Integer topK) {
+
         Comparator<Pair<Document, Double>> docComparator = new Comparator<Pair<Document, Double>>() {
             @Override
             public int compare(Pair<Document, Double> o1, Pair<Document, Double> o2) {
                 return o1.getRight().compareTo(o2.getRight());
             }
         };
-
-        Queue<Pair<Document, Double>> result = new PriorityQueue<>(topK, docComparator);
+        Queue<Pair<Document, Double>> result;
 
         List<String> tokens = new ArrayList<>();
         Map<String, Double> TFIDF4query = new TreeMap<>();
@@ -1116,7 +1122,7 @@ public class InvertedIndexManager {
             else
                 TFIDF4query.put(token, 1.0);
         }
-        //System.out.println(TFIDF4query);
+
         int numOfDocs = 0;
         List<String> finalTokens = new ArrayList<>(TFIDF4query.keySet());
         Map<String, Double> IDF = new TreeMap<>();
@@ -1130,28 +1136,48 @@ public class InvertedIndexManager {
                     IDF.put(str, (double)docFreq);
             }
         }
-        //System.out.println(IDF);
+
+        if (topK == null){
+            result = new PriorityQueue<>(numOfDocs, docComparator);
+        }
+        else if (topK == 0) {
+            return Collections.emptyIterator();
+        }
+        else {
+            result = new PriorityQueue<>(topK, docComparator);
+        }
+
         for (String str : finalTokens){
             IDF.replace(str, Math.log10(numOfDocs / IDF.get(str)));
             TFIDF4query.replace(str, TFIDF4query.get(str) * IDF.get(str));
         }
 
         for (int segmentId = 0; segmentId < getNumSegments(); segmentId++){
+            List<String> copy = new ArrayList<>(finalTokens);
+            int length = finalTokens.size();
+
             Map<Integer, Double> dotProductAccumulator = new TreeMap<>();
             Map<Integer, Double> vectorLengthAccumulator = new TreeMap<>();
             Map<Integer, Double> score = new TreeMap<>();
             InvertedIndexIterator itr = new InvertedIndexIterator(segmentId, compressor);
             AutoLoadBuffer positionBuffer = itr.positionFileBuffer;
 
-            for (String str : finalTokens){
-                docListRID docRID = itr.next(Arrays.asList(str), true);
+            while (length > 0){
+                docListRID docRID = itr.next(copy, true);
+                if (docRID.docIdList.isEmpty()){
+                    break;
+                }
+
+                String str = itr.keywordList.get(itr.currentKeywordId);
+                int index = copy.indexOf(str);
+                copy.subList(0, index + 1).clear();
+                length -= (index + 1);
 
                 for (int j = 0; j < docRID.docIdList.size(); j++){
                     int docId = docRID.docIdList.get(j);
                     positionBuffer.setRID(docRID.positionRidList.get(j));
                     int lengthOfPosition = getLength(positionBuffer, compressor);
                     double TfIdf = lengthOfPosition * IDF.get(str);
-                    //System.out.println(TfIdf);
 
                     if (dotProductAccumulator.containsKey(docId) || vectorLengthAccumulator.containsKey(docId)){
                         dotProductAccumulator.replace(docId, dotProductAccumulator.get(docId) +
@@ -1166,8 +1192,7 @@ public class InvertedIndexManager {
                 }
 
             }
-            //System.out.println(dotProductAccumulator);
-            //System.out.println(vectorLengthAccumulator);
+
             try {
                 itr.close();
             }
@@ -1198,24 +1223,28 @@ public class InvertedIndexManager {
             });
 
             List<Map.Entry<Integer, Double>> maxKScores;
-            if (scoreList.size() < topK)
+            if (topK == null)
                 maxKScores = scoreList;
-            else
-                maxKScores = scoreList.subList(0, topK);
-            //System.out.println(maxKScores);
+            else if (scoreList.size() < topK)
+                    maxKScores = scoreList;
+                else
+                    maxKScores = scoreList.subList(0, topK);
 
             DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segmentId));
             for (Map.Entry<Integer, Double> entry : maxKScores){
                 Document document = documentStore.getDocument(entry.getKey());
                 Pair<Document, Double> pair = new Pair<>(document, entry.getValue());
                 result.offer(pair);
-                while (result.size() > topK)
-                    result.poll();
+
+                if (topK != null) {
+                    while (result.size() > topK)
+                        result.poll();
+                }
             }
-            //System.out.println(result);
+
             documentStore.close();
         }
-        //System.out.println(result);
+
         List<Pair<Document, Double>> temp = new ArrayList<>();
         List<Pair<Document, Double>> finalResult = new ArrayList<>();
         while (result.size() > 0){
@@ -1225,7 +1254,7 @@ public class InvertedIndexManager {
             finalResult.add(temp.get(m));
         }
         return finalResult.iterator();
-        //throw new UnsupportedOperationException();
+
     }
 
     public int getLength(AutoLoadBuffer positionFileBuffer, Compressor compressor){
