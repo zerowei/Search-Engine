@@ -321,6 +321,7 @@ public class InvertedIndexManager {
         Compressor compressor;
 
         int currentKeywordId;
+        int cacheId;
         List<String> keywordList;
         List<Integer> segmentRidList;
 
@@ -350,6 +351,7 @@ public class InvertedIndexManager {
             this.segmentRidList = new ArrayList<>();
 
             currentKeywordId = 0;
+            cacheId = 0;
             int numKeywords = headerFileBuffer.getInt();
             for (int i = 0; i < numKeywords; i++) {
                 int lenKeyword = headerFileBuffer.getInt();
@@ -427,8 +429,8 @@ public class InvertedIndexManager {
             int documentIdPageId = 0;
             int documentIdOffset = 0;
 
-
             for (i = currentKeywordId; i < keywordList.size(); i++){
+                cacheId = currentKeywordId;
                 if (!keywords.contains(keywordList.get(i))) {
                     continue;
                 }
@@ -439,7 +441,7 @@ public class InvertedIndexManager {
                 break;
             }
 
-            if (i == keywordList.size() && currentKeywordId == 0){
+            if (i == keywordList.size() && currentKeywordId == cacheId){
                 return nulldocListRID;
             }
 
@@ -1073,6 +1075,222 @@ public class InvertedIndexManager {
         }
 
         return finalResults.iterator();
+    }
+
+    /**
+     * Performs top-K ranked search using TF-IDF.
+     * Returns an iterator that returns the top K documents with highest TF-IDF scores.
+     *
+     * Each element is a pair of <Document, Double (TF-IDF Score)>.
+     *
+     * If parameter `topK` is null, then returns all the matching documents.
+     *
+     * Unlike Boolean Query and Phrase Query where order of the documents doesn't matter,
+     * for ranked search, order of the document returned by the iterator matters.
+     *
+     * @param keywords, a list of keywords in the query
+     * @param topK, number of top documents weighted by TF-IDF, all documents if topK is null
+     * @return a iterator of top-k ordered documents matching the query
+     */
+    public Iterator<Pair<Document, Double>> searchTfIdf(List<String> keywords, Integer topK) {
+        Comparator<Pair<Document, Double>> docComparator = new Comparator<Pair<Document, Double>>() {
+            @Override
+            public int compare(Pair<Document, Double> o1, Pair<Document, Double> o2) {
+                return o1.getRight().compareTo(o2.getRight());
+            }
+        };
+
+        Queue<Pair<Document, Double>> result = new PriorityQueue<>(topK, docComparator);
+
+        List<String> tokens = new ArrayList<>();
+        Map<String, Double> TFIDF4query = new TreeMap<>();
+
+        for (String keyword : keywords){
+            tokens.add(analyzer.analyze(keyword).get(0));
+        }
+        Collections.sort(tokens);
+
+        for (String token : tokens){
+            if (TFIDF4query.containsKey(token))
+                TFIDF4query.replace(token, TFIDF4query.get(token) + 1.0);
+            else
+                TFIDF4query.put(token, 1.0);
+        }
+        //System.out.println(TFIDF4query);
+        int numOfDocs = 0;
+        List<String> finalTokens = new ArrayList<>(TFIDF4query.keySet());
+        Map<String, Double> IDF = new TreeMap<>();
+        for (int i = 0; i < getNumSegments(); i++){
+            numOfDocs += getNumDocuments(i);
+            for (String str : finalTokens){
+                int docFreq = getDocumentFrequency(i, str);
+                if (IDF.containsKey(str))
+                    IDF.replace(str, IDF.get(str) + (double)docFreq);
+                else
+                    IDF.put(str, (double)docFreq);
+            }
+        }
+        //System.out.println(IDF);
+        for (String str : finalTokens){
+            IDF.replace(str, Math.log10(numOfDocs / IDF.get(str)));
+            TFIDF4query.replace(str, TFIDF4query.get(str) * IDF.get(str));
+        }
+
+        for (int segmentId = 0; segmentId < getNumSegments(); segmentId++){
+            Map<Integer, Double> dotProductAccumulator = new TreeMap<>();
+            Map<Integer, Double> vectorLengthAccumulator = new TreeMap<>();
+            Map<Integer, Double> score = new TreeMap<>();
+            InvertedIndexIterator itr = new InvertedIndexIterator(segmentId, compressor);
+            AutoLoadBuffer positionBuffer = itr.positionFileBuffer;
+
+            for (String str : finalTokens){
+                docListRID docRID = itr.next(Arrays.asList(str), true);
+
+                for (int j = 0; j < docRID.docIdList.size(); j++){
+                    int docId = docRID.docIdList.get(j);
+                    positionBuffer.setRID(docRID.positionRidList.get(j));
+                    int lengthOfPosition = getLength(positionBuffer, compressor);
+                    double TfIdf = lengthOfPosition * IDF.get(str);
+                    //System.out.println(TfIdf);
+
+                    if (dotProductAccumulator.containsKey(docId) || vectorLengthAccumulator.containsKey(docId)){
+                        dotProductAccumulator.replace(docId, dotProductAccumulator.get(docId) +
+                                                        TfIdf * TFIDF4query.get(str));
+                        vectorLengthAccumulator.replace(docId, vectorLengthAccumulator.get(docId) +
+                                                        Math.pow(TfIdf, 2));
+                    }
+                    else {
+                        dotProductAccumulator.put(docId, TfIdf * TFIDF4query.get(str));
+                        vectorLengthAccumulator.put(docId, Math.pow(TfIdf, 2));
+                    }
+                }
+
+            }
+            //System.out.println(dotProductAccumulator);
+            //System.out.println(vectorLengthAccumulator);
+            try {
+                itr.close();
+            }
+            catch (Exception e){
+                e.printStackTrace();
+            }
+
+            if (dotProductAccumulator.isEmpty() && vectorLengthAccumulator.isEmpty()){
+                continue;
+            }
+
+            for (Integer docId : dotProductAccumulator.keySet()){
+                score.put(docId, dotProductAccumulator.get(docId) / Math.sqrt(vectorLengthAccumulator.get(docId)));
+            }
+
+            List<Map.Entry<Integer, Double>> scoreList = new ArrayList<>(score.entrySet());
+
+            Collections.sort(scoreList, new Comparator<Map.Entry<Integer, Double>>() {
+                @Override
+                public int compare(Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2) {
+                    if (o1.getValue() < o2.getValue())
+                        return 1;
+                    else if (o1.getValue().equals(o2.getValue()))
+                        return 0;
+                    else
+                        return -1;
+                }
+            });
+
+            List<Map.Entry<Integer, Double>> maxKScores;
+            if (scoreList.size() < topK)
+                maxKScores = scoreList;
+            else
+                maxKScores = scoreList.subList(0, topK);
+            //System.out.println(maxKScores);
+
+            DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segmentId));
+            for (Map.Entry<Integer, Double> entry : maxKScores){
+                Document document = documentStore.getDocument(entry.getKey());
+                Pair<Document, Double> pair = new Pair<>(document, entry.getValue());
+                result.offer(pair);
+                while (result.size() > topK)
+                    result.poll();
+            }
+            //System.out.println(result);
+            documentStore.close();
+        }
+        //System.out.println(result);
+        List<Pair<Document, Double>> temp = new ArrayList<>();
+        List<Pair<Document, Double>> finalResult = new ArrayList<>();
+        while (result.size() > 0){
+            temp.add(result.poll());
+        }
+        for (int m = temp.size() - 1; m >= 0; m--){
+            finalResult.add(temp.get(m));
+        }
+        return finalResult.iterator();
+        //throw new UnsupportedOperationException();
+    }
+
+    public int getLength(AutoLoadBuffer positionFileBuffer, Compressor compressor){
+        int lengthPosition;
+        final byte mask = (byte) (1 << 7);
+        byte b = mask;
+
+        if (compressor instanceof NaiveCompressor) {
+            lengthPosition = positionFileBuffer.getInt();
+        } else {
+            List<Byte> lengthPositionBytes = new ArrayList<>();
+            while ((b & mask) != 0) {
+                b = positionFileBuffer.getByte();
+                lengthPositionBytes.add(b);
+            }
+            lengthPosition = compressor.decode(Bytes.toArray(lengthPositionBytes)).get(0);
+        }
+
+        return lengthPosition;
+    }
+
+    /**
+     * Returns the total number of documents within the given segment.
+     */
+    public int getNumDocuments(int segmentNum) {
+        DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segmentNum));
+        int storeSize = (int)documentStore.size();
+        documentStore.close();
+        return storeSize;
+    }
+
+    /**
+     * Returns the number of documents containing the token within the given segment.
+     * The token should be already analyzed by the analyzer. The analyzer shouldn't be applied again.
+     */
+    public int getDocumentFrequency(int segmentNum, String token) {
+        return searchFrequency(segmentNum, token);
+    }
+
+    public int searchFrequency(int segmentNum, String keyword) {
+        Preconditions.checkNotNull(keyword);
+        if (keyword.equals("")) {
+            return 0;
+        }
+
+        InvertedIndexIterator itr = new InvertedIndexIterator(segmentNum, compressor);
+        List<Integer> documentIds = itr.next(Arrays.asList(keyword), false).docIdList;
+
+        if (documentIds.isEmpty()){
+            try {
+                itr.close();
+                return 0;
+            }
+            catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        try {
+            itr.close();
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+        return documentIds.size();
     }
 
     /**
