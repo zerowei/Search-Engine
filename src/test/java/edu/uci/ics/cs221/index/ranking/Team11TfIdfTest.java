@@ -141,13 +141,12 @@ public class Team11TfIdfTest {
     public void TfIdfTest4(){
         index.addDocument(documents[0]);
         index.addDocument(documents[2]);
-        index.addDocument(documents[5]);
         index.addDocument(documents[6]);
         index.addDocument(documents[7]);
         index.flush();
 
         List<Document> expected = new ArrayList<>(Arrays.asList(documents[7], documents[0],
-                                                                documents[2], documents[6], documents[5]));
+                                                                documents[2], documents[6]));
         List<String> keywords = Arrays.asList("good", "good", "idea");
         Iterator<Pair<Document, Double>> itr = index.searchTfIdf(keywords, null);
         int i = 0;
@@ -156,6 +155,8 @@ public class Team11TfIdfTest {
             assertEquals(expected.get(i), itr.next().getLeft());
             i++;
         }
+
+        assertEquals(expected.size(), i);
     }
 
 }

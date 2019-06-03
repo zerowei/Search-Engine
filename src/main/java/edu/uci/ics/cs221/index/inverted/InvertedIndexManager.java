@@ -264,11 +264,14 @@ public class InvertedIndexManager {
             segmentFileBuffer.putInt(encodedDocumentIds.length);
             segmentFileBuffer.put(encodedDocumentIds);
 
+            List<Integer> positionsLength = new ArrayList<>();
+
             List<Integer> positionOffsetList = new ArrayList<>();
             for (int i = 0; i < documentIds.size(); i++) {
                 assert index.docPositions.get(documentIds.get(i)).size() > 0;
 
                 positionOffsetList.add(positionFileBuffer.getRID());
+                positionsLength.add(index.docPositions.get(documentIds.get(i)).size());
 
                 byte[] encodedPositions = compressor.encode(index.docPositions.get(documentIds.get(i)));
                 positionFileBuffer.put(compressor.encode(Arrays.asList(encodedPositions.length)));
@@ -278,6 +281,10 @@ public class InvertedIndexManager {
             byte[] encodedPositionOffsetList = compressor.encode(positionOffsetList);
             segmentFileBuffer.putInt(encodedPositionOffsetList.length);
             segmentFileBuffer.put(encodedPositionOffsetList);
+            segmentFileBuffer.putInt(positionsLength.size());
+            for (Integer length : positionsLength){
+                segmentFileBuffer.putInt(length);
+            }
         }
     }
 
@@ -381,6 +388,10 @@ public class InvertedIndexManager {
             byte[] encodedDocumentIds = segmentFileBuffer.getByteArray(lengthEncodedDocumentIds);
             int lengthPositionRIDs = segmentFileBuffer.getInt();
             byte[] encodedPositionRIDs = segmentFileBuffer.getByteArray(lengthPositionRIDs);
+            int positionLength = segmentFileBuffer.getInt();
+            for (int i = 0; i < positionLength; i++){
+                segmentFileBuffer.getInt();
+            }
 
             List<Integer> documentIdList = compressor.decode(encodedDocumentIds);
             // Not used in sequential reading
@@ -1160,10 +1171,9 @@ public class InvertedIndexManager {
             Map<Integer, Double> vectorLengthAccumulator = new TreeMap<>();
             Map<Integer, Double> score = new TreeMap<>();
             InvertedIndexIterator itr = new InvertedIndexIterator(segmentId, compressor);
-            AutoLoadBuffer positionBuffer = itr.positionFileBuffer;
 
             while (length > 0){
-                docListRID docRID = itr.next(copy, true);
+                docListRID docRID = itr.next(copy, false);
                 if (docRID.docIdList.isEmpty()){
                     break;
                 }
@@ -1173,10 +1183,15 @@ public class InvertedIndexManager {
                 copy.subList(0, index + 1).clear();
                 length -= (index + 1);
 
+                int positionLength = itr.segmentFileBuffer.getInt();
+                List<Integer> positionsLength = new ArrayList<>();
+                for (int n = 0; n < positionLength; n++){
+                    positionsLength.add(itr.segmentFileBuffer.getInt());
+                }
+
                 for (int j = 0; j < docRID.docIdList.size(); j++){
                     int docId = docRID.docIdList.get(j);
-                    positionBuffer.setRID(docRID.positionRidList.get(j));
-                    int lengthOfPosition = getLength(positionBuffer, compressor);
+                    int lengthOfPosition = positionsLength.get(j);
                     double TfIdf = lengthOfPosition * IDF.get(str);
 
                     if (dotProductAccumulator.containsKey(docId) || vectorLengthAccumulator.containsKey(docId)){
@@ -1255,25 +1270,6 @@ public class InvertedIndexManager {
         }
         return finalResult.iterator();
 
-    }
-
-    public int getLength(AutoLoadBuffer positionFileBuffer, Compressor compressor){
-        int lengthPosition;
-        final byte mask = (byte) (1 << 7);
-        byte b = mask;
-
-        if (compressor instanceof NaiveCompressor) {
-            lengthPosition = positionFileBuffer.getInt();
-        } else {
-            List<Byte> lengthPositionBytes = new ArrayList<>();
-            while ((b & mask) != 0) {
-                b = positionFileBuffer.getByte();
-                lengthPositionBytes.add(b);
-            }
-            lengthPosition = compressor.decode(Bytes.toArray(lengthPositionBytes)).get(0);
-        }
-
-        return lengthPosition;
     }
 
     /**
