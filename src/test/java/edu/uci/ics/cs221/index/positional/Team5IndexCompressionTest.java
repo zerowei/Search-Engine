@@ -184,11 +184,11 @@ public class Team5IndexCompressionTest {
     int compress_wc = PageFileChannel.writeCounter;
     int compress_rc = PageFileChannel.readCounter;
     Assert.assertTrue(
-            "naive write counter > 1.5 delta compress write count  \n Actual  naive write: "
-                    + naive_wc
-                    + " delta write count: "
-                    + compress_wc,
-            naive_wc > 1.5 * compress_wc);
+        "naive write counter > 1.5 delta compress write count  \n Actual  naive write: "
+            + naive_wc
+            + " delta write count: "
+            + compress_wc,
+        naive_wc > 1.5 * compress_wc);
 
     System.out.println("\033[0;32m");
     System.out.println("Naive compress write: " + naive_wc + " pages");

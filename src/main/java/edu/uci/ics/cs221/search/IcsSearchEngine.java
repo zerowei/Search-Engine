@@ -32,7 +32,7 @@ public class IcsSearchEngine {
      * Computes the page rank score from the "id-graph.tsv" file in the document directory.
      * The results of the computation can be saved in a class variable and will be later retrieved by `getPageRankScores`.
      */
-    public void computePageRank() {
+    public void computePageRank(int numIterations) {
         throw new UnsupportedOperationException();
     }
 
