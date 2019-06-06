@@ -1,3 +1,10 @@
+# CS221-Project
+
+## Team Member
+
+* Tianyi WEI (91643717)
+* Rui GUO (47407667)
+
 ## CS221 Project - Peterman Search Engine
 
 This repository contains the starter skeleton code for the CS221 project. 
@@ -7,4 +14,5 @@ This repository contains the starter skeleton code for the CS221 project.
 1. run `mvn clean install -DskipTests` in command line
 1. open IntelliJ -> Open -> Choose the directory. Wait for IntelliJ to finish importing and building.
 1. You can run the `HelloWorld` program under `src/main/java/edu.uci.ics.cs221` package to test if everything works.
+
 
