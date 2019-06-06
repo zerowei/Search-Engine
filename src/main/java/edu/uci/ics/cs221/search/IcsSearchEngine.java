@@ -51,14 +51,14 @@ public class IcsSearchEngine {
         Arrays.sort(files, new SortbyFileName());
 
         numWebpages = files.length;
-        System.out.println("num web pages " + numWebpages);
+        //System.out.println("num web pages " + numWebpages);
 
         //for (int i = 0; i < files.length; i++) {
         int i;
         for (i = 0; i < numWebpages; i++) {
             File file = files[i];
             try {
-                System.out.println(file.getPath());
+                //System.out.println(file.getPath());
                 String content = new String(Files.readAllBytes(Paths.get(file.getPath())));
                 indexManager.addDocument(new Document(content));
             } catch (IOException e) {
@@ -77,7 +77,7 @@ public class IcsSearchEngine {
         Arrays.sort(files, new SortbyFileName());
 
         numWebpages = files.length;
-        System.out.println("num web pages " + numWebpages);
+        //System.out.println("num web pages " + numWebpages);
 
         incomingEdges = new ArrayList<>();
         outDegrees = new ArrayList<>();
@@ -102,6 +102,8 @@ public class IcsSearchEngine {
 
         double maxPR = -1, minPR = numWebpages * 10;
         for (int iterNum = 0; iterNum < numIterations; iterNum++) {
+            //System.out.println("iter " + iterNum);
+
             List<Double> newPR = new ArrayList<>();
             for (int i = 0; i < numWebpages; i++) {
                 newPR.add(0.0);
@@ -125,11 +127,13 @@ public class IcsSearchEngine {
                 }
             }
 
+            /*
             System.out.print("iter " + iterNum + " ");
             for (int i = 0; i < numWebpages; i++) {
                 System.out.print(i + " : " + newPR.get(i) + "\t");
             }
             System.out.println();
+             */
 
             currentPR = newPR;
         }
@@ -147,8 +151,11 @@ public class IcsSearchEngine {
         List<Pair<Integer, Double>> result = new ArrayList<>();
 
         for (int i = 0; i < numWebpages; i++) {
-            result.add(new Pair<Integer, Double>(i, currentPR.get(i)));
+            result.add(new Pair<>(i, currentPR.get(i)));
         }
+
+        result.sort((m1, m2) -> (m1.getRight() > m2.getRight()) ? -1 : (m1.getRight() < m2.getRight()) ? 1 : 0);
+
         return result;
     }
 
@@ -170,5 +177,4 @@ public class IcsSearchEngine {
     public Iterator<Pair<Document, Double>> searchQuery(List<String> query, int topK, double pageRankWeight) {
         throw new UnsupportedOperationException();
     }
-
 }
