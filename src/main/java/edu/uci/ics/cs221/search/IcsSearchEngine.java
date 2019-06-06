@@ -51,6 +51,7 @@ public class IcsSearchEngine {
         Arrays.sort(files, new SortbyFileName());
 
         numWebpages = files.length;
+        System.out.println("num web pages " + numWebpages);
 
         //for (int i = 0; i < files.length; i++) {
         int i;
@@ -64,7 +65,6 @@ public class IcsSearchEngine {
                 e.printStackTrace();
             }
         }
-
     }
 
     /**
@@ -72,6 +72,13 @@ public class IcsSearchEngine {
      * The results of the computation can be saved in a class variable and will be later retrieved by `getPageRankScores`.
      */
     public void computePageRank(int numIterations) {
+        File cleanedFile = documentDirectory.resolve("cleaned").toFile();
+        File[] files = cleanedFile.listFiles();
+        Arrays.sort(files, new SortbyFileName());
+
+        numWebpages = files.length;
+        System.out.println("num web pages " + numWebpages);
+
         incomingEdges = new ArrayList<>();
         outDegrees = new ArrayList<>();
         currentPR = new ArrayList<>();
@@ -137,7 +144,12 @@ public class IcsSearchEngine {
      * Returns an list of <DocumentID - Score> Pairs that is sorted by score in descending order (high scores first).
      */
     public List<Pair<Integer, Double>> getPageRankScores() {
-        throw new UnsupportedOperationException();
+        List<Pair<Integer, Double>> result = new ArrayList<>();
+
+        for (int i = 0; i < numWebpages; i++) {
+            result.add(new Pair<Integer, Double>(i, currentPR.get(i)));
+        }
+        return result;
     }
 
     /**
