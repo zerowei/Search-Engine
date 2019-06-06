@@ -4,11 +4,22 @@ import edu.uci.ics.cs221.index.inverted.InvertedIndexManager;
 import edu.uci.ics.cs221.index.inverted.Pair;
 import edu.uci.ics.cs221.storage.Document;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Iterator;
-import java.util.List;
+import java.nio.file.Paths;
+import java.util.*;
 
 public class IcsSearchEngine {
+    private Path documentDirectory;
+    private InvertedIndexManager indexManager;
+
+    private int numWebpages;
+    private List<List<Integer>> incomingEdges;
+    private List<Integer> outDegrees;
+    private List<Double> currentPR;
+
 
     /**
      * Initializes an IcsSearchEngine from the directory containing the documents and the
@@ -19,13 +30,41 @@ public class IcsSearchEngine {
     }
 
     private IcsSearchEngine(Path documentDirectory, InvertedIndexManager indexManager) {
+        this.documentDirectory = documentDirectory;
+        this.indexManager = indexManager;
+    }
+
+    private class SortbyFileName implements Comparator<File>
+    {
+        public int compare(File a, File b)
+        {
+            return Integer.parseInt(a.getName()) - Integer.parseInt(b.getName());
+        }
     }
 
     /**
      * Writes all ICS web page documents in the document directory to the inverted index.
      */
     public void writeIndex() {
-        throw new UnsupportedOperationException();
+        File cleanedFile = documentDirectory.resolve("cleaned").toFile();
+        File[] files = cleanedFile.listFiles();
+        Arrays.sort(files, new SortbyFileName());
+
+        numWebpages = files.length;
+
+        //for (int i = 0; i < files.length; i++) {
+        int i;
+        for (i = 0; i < numWebpages; i++) {
+            File file = files[i];
+            try {
+                System.out.println(file.getPath());
+                String content = new String(Files.readAllBytes(Paths.get(file.getPath())));
+                indexManager.addDocument(new Document(content));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 
     /**
@@ -33,7 +72,64 @@ public class IcsSearchEngine {
      * The results of the computation can be saved in a class variable and will be later retrieved by `getPageRankScores`.
      */
     public void computePageRank(int numIterations) {
-        throw new UnsupportedOperationException();
+        incomingEdges = new ArrayList<>();
+        outDegrees = new ArrayList<>();
+        currentPR = new ArrayList<>();
+        for (int i = 0; i < numWebpages; i++) {
+            incomingEdges.add(new ArrayList<>());
+            outDegrees.add(0);
+            currentPR.add(1.0);
+        }
+
+        try {
+            Files.readAllLines(documentDirectory.resolve("id-graph.tsv")).stream().map(line -> line.split("\\s")).forEach(line -> {
+                int from = Integer.parseInt(line[0].trim());
+                int to = Integer.parseInt(line[1].trim());
+
+                incomingEdges.get(to).add(from);
+                outDegrees.set(from, outDegrees.get(from) + 1);
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        double maxPR = -1, minPR = numWebpages * 10;
+        for (int iterNum = 0; iterNum < numIterations; iterNum++) {
+            List<Double> newPR = new ArrayList<>();
+            for (int i = 0; i < numWebpages; i++) {
+                newPR.add(0.0);
+            }
+
+            for (int i = 0; i < numWebpages; i++) {
+                double sumIncomingPR = 0.0;
+                for (int incomeId: incomingEdges.get(i)) {
+                    sumIncomingPR += currentPR.get(incomeId) / outDegrees.get(incomeId).doubleValue();
+                }
+
+                double DAMPING_FACTOR = 0.85;
+                double value = (1-DAMPING_FACTOR) + DAMPING_FACTOR * sumIncomingPR;
+                newPR.set(i, value);
+
+                if (value < minPR) {
+                    minPR = value;
+                }
+                if (value > maxPR) {
+                    maxPR = value;
+                }
+            }
+
+            System.out.print("iter " + iterNum + " ");
+            for (int i = 0; i < numWebpages; i++) {
+                System.out.print(i + " : " + newPR.get(i) + "\t");
+            }
+            System.out.println();
+
+            currentPR = newPR;
+        }
+
+        for (int i = 0; i < numWebpages; i++) {
+            currentPR.set(i, (currentPR.get(i) - minPR) / maxPR);
+        }
     }
 
     /**
