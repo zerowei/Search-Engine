@@ -180,7 +180,7 @@ public class IcsSearchEngine {
      * This is a workaround because our project doesn't support multiple fields. We cannot keep the documentID in a separate column.
      */
     public Iterator<Pair<Document, Double>> searchQuery(List<String> query, int topK, double pageRankWeight) {
-        Iterator<Pair<Document, Double>> it = indexManager.searchTfIdf(query, null);
+        Iterator<Pair<Document, Double>> it = indexManager.searchTfIdf(query, null, false);
 
         List<Pair<Document, Double>> result = new ArrayList<>();
         while (it.hasNext()) {

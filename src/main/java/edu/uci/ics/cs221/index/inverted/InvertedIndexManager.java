@@ -1127,6 +1127,10 @@ public class InvertedIndexManager {
      * @return a iterator of top-k ordered documents matching the query
      */
     public Iterator<Pair<Document, Double>> searchTfIdf(List<String> keywords, Integer topK) {
+        return searchTfIdf(keywords, topK, true);
+    }
+
+    public Iterator<Pair<Document, Double>> searchTfIdf(List<String> keywords, Integer topK, boolean matchesOnly) {
 
         Comparator<Pair<Document, Double>> docComparator = new CompareResults();
         Queue<Pair<Document, Double>> result;
