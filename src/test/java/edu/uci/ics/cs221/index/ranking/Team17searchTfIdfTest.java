@@ -114,7 +114,6 @@ public class Team17searchTfIdfTest {
         expected.add(doc2.getText());
         expected.add(doc3.getText());
 
-
         while(res.hasNext()){
             count ++;
             Pair<Document, Double> result = res.next();

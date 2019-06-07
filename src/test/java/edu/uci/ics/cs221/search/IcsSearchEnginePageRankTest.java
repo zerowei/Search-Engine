@@ -104,7 +104,7 @@ public class IcsSearchEnginePageRankTest {
 
         // in top 1000, there are many urls include grape.ics.uci.edu
         Assert.assertTrue(pageRankScores.stream().limit(1000).map(p -> p.getLeft()).map(id -> idUrlMap.get(id))
-                .filter(url -> url.contains("isg.ics.uci.edu")).count() > 5);
+                .filter(url -> url.contains("grape.ics.uci.edu")).count() > 5);
     }
 
 }

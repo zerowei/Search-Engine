@@ -19,6 +19,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * This test is for Project 4 Task 2 - PageRank and Search ICS webpages.
@@ -48,6 +50,7 @@ public class IcsSearchEngineTest {
         icsSearchEngine = IcsSearchEngine.createSearchEngine(webPagesPath, invertedIndexManager);
 
         icsSearchEngine.writeIndex();
+
         icsSearchEngine.computePageRank(100);
 
         idUrlMap = HashBiMap.create();
@@ -80,8 +83,8 @@ public class IcsSearchEngineTest {
     public void testCombinePageRankTfIdf() {
 
         Iterator<Pair<Document, Double>> resultIterator = icsSearchEngine.searchQuery(
-                Arrays.asList("ISG", "Bren", "School", "UCI"),
-                100, 100.0);
+                Arrays.asList("ISG"),
+                20, 1.0);
         ImmutableList<Pair<Document, Double>> resultList = ImmutableList.copyOf(resultIterator);
 
         // first result should be "isg.ics.uci.edu"
@@ -92,7 +95,7 @@ public class IcsSearchEngineTest {
                 .anyMatch(p -> p.contains("hobbes.ics.uci.edu")));
 
         // top 50 should have URL "ipubmed2.ics.uci.edu"
-        Assert.assertTrue(resultList.stream().limit(50).map(p -> getDocumentUrl(p.getLeft().getText()))
+        Assert.assertTrue(resultList.stream().limit(20).map(p -> getDocumentUrl(p.getLeft().getText()))
                 .anyMatch(p -> p.equals("ipubmed2.ics.uci.edu")));
 
     }
@@ -113,18 +116,20 @@ public class IcsSearchEngineTest {
     }
 
     /**
-     * Sets a very page rank weight to 0. Result should be the same as TF-IDF
+     * Sets the rank weight to 0. Result should be the same as TF-IDF
      */
     @Test
     public void testCombineRankZeroPageRankWeight() {
         Iterator<Pair<Document, Double>> resultIterator = icsSearchEngine.searchQuery(Arrays.asList("anteater"),
                 100, 0.0);
-        ImmutableList<Pair<Document, Double>> resultListCombined = ImmutableList.copyOf(resultIterator);
+        List<Double> resultScoresCombined = ImmutableList.copyOf(resultIterator)
+                .stream().map(p -> p.getRight()).collect(Collectors.toList());
 
         Iterator<Pair<Document, Double>> resultIteratorTfIdf = invertedIndexManager.searchTfIdf(Arrays.asList("anteater"), 100);
-        ImmutableList<Pair<Document, Double>> resultListTfIdf = ImmutableList.copyOf(resultIteratorTfIdf);
+        List<Double> resultScoresTfIdf = ImmutableList.copyOf(resultIteratorTfIdf)
+                .stream().map(p -> p.getRight()).collect(Collectors.toList());
 
-        Assert.assertEquals(resultListTfIdf, resultListCombined);
+        Assert.assertEquals(resultScoresTfIdf, resultScoresCombined);
     }
 
 
