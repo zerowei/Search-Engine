@@ -51,14 +51,12 @@ public class IcsSearchEngine {
         Arrays.sort(files, new SortbyFileName());
 
         numWebpages = files.length;
-        //System.out.println("num web pages " + numWebpages);
+        System.out.println("num web pages " + numWebpages);
 
-        //for (int i = 0; i < files.length; i++) {
-        int i;
-        for (i = 0; i < numWebpages; i++) {
+        for (int i = 0; i < numWebpages; i++) {
             File file = files[i];
             try {
-                //System.out.println(file.getPath());
+                System.out.println(file.getPath());
                 String content = new String(Files.readAllBytes(Paths.get(file.getPath())));
                 indexManager.addDocument(new Document(content));
             } catch (IOException e) {
@@ -103,6 +101,8 @@ public class IcsSearchEngine {
         double maxPR = -1, minPR = numWebpages * 10;
         for (int iterNum = 0; iterNum < numIterations; iterNum++) {
             //System.out.println("iter " + iterNum);
+            maxPR = -1;
+            minPR = numWebpages * 10;
 
             List<Double> newPR = new ArrayList<>();
             for (int i = 0; i < numWebpages; i++) {
@@ -159,6 +159,11 @@ public class IcsSearchEngine {
         return result;
     }
 
+    public static int getDocumentId(String text) {
+        String[] result = text.split("\n");
+        return Integer.parseInt(result[0].trim());
+    }
+
     /**
      * Searches the ICS document corpus and returns the top K documents ranked by combining TF-IDF and PageRank.
      *
@@ -175,6 +180,19 @@ public class IcsSearchEngine {
      * This is a workaround because our project doesn't support multiple fields. We cannot keep the documentID in a separate column.
      */
     public Iterator<Pair<Document, Double>> searchQuery(List<String> query, int topK, double pageRankWeight) {
-        throw new UnsupportedOperationException();
+        Iterator<Pair<Document, Double>> it = indexManager.searchTfIdf(query, null);
+
+        List<Pair<Document, Double>> result = new ArrayList<>();
+        while (it.hasNext()) {
+            Pair<Document, Double> pair = it.next();
+            int documentId = getDocumentId(pair.getLeft().getText());
+            System.out.println("document id " + getDocumentId(pair.getLeft().getText()));
+            System.out.println("right " + pair.getRight() + " PR " + currentPR.get(documentId));
+            double score = pair.getRight() + pageRankWeight * currentPR.get(documentId);
+            result.add(new Pair<>(pair.getLeft(), score));
+        }
+
+        result.sort(new InvertedIndexManager.CompareResults());
+        return result.subList(0, topK).iterator();
     }
 }

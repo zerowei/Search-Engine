@@ -18,6 +18,8 @@ import java.nio.file.Paths;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import static edu.uci.ics.cs221.search.IcsSearchEngine.getDocumentId;
+
 /**
  * This class manages an disk-based inverted index and all the documents in the inverted index.
  *
@@ -190,6 +192,7 @@ public class InvertedIndexManager {
 
         numDocuments += 1;
         if (numDocuments == DEFAULT_FLUSH_THRESHOLD) {
+            System.out.println("flushing...");
             flush();
         }
 
@@ -317,6 +320,7 @@ public class InvertedIndexManager {
         numSegments += 1;
 
         if (numSegments == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
+            System.out.println("merging...");
             mergeAllSegments();
         }
     }
@@ -1094,6 +1098,19 @@ public class InvertedIndexManager {
         return finalResults.iterator();
     }
 
+    public static class CompareResults implements Comparator<Pair<Document, Double>> {
+        @Override public int compare(Pair<Document, Double> o1, Pair<Document, Double> o2) {
+            int compareValue = o1.getRight().compareTo(o2.getRight());
+            if (compareValue != 0) {
+                return compareValue;
+            }
+
+            int documentId1 = getDocumentId(o1.getLeft().getText());
+            int documentId2 = getDocumentId(o2.getLeft().getText());
+            return documentId1 - documentId2;
+        }
+    }
+
     /**
      * Performs top-K ranked search using TF-IDF.
      * Returns an iterator that returns the top K documents with highest TF-IDF scores.
@@ -1111,12 +1128,7 @@ public class InvertedIndexManager {
      */
     public Iterator<Pair<Document, Double>> searchTfIdf(List<String> keywords, Integer topK) {
 
-        Comparator<Pair<Document, Double>> docComparator = new Comparator<Pair<Document, Double>>() {
-            @Override
-            public int compare(Pair<Document, Double> o1, Pair<Document, Double> o2) {
-                return o1.getRight().compareTo(o2.getRight());
-            }
-        };
+        Comparator<Pair<Document, Double>> docComparator = new CompareResults();
         Queue<Pair<Document, Double>> result;
 
         List<String> tokens = new ArrayList<>();
