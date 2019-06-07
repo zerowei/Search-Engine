@@ -1131,14 +1131,28 @@ public class InvertedIndexManager {
     }
 
     public Iterator<Pair<Document, Double>> searchTfIdf(List<String> keywords, Integer topK, boolean matchesOnly) {
+        Comparator<Pair<Document, Double>> docComparator;
 
-        Comparator<Pair<Document, Double>> docComparator = new CompareResults();
+        if (!matchesOnly) {
+            docComparator = new CompareResults();
+        }
+        else{
+            docComparator = new Comparator<Pair<Document, Double>>() {
+                @Override
+                public int compare(Pair<Document, Double> o1, Pair<Document, Double> o2) {
+                    return Double.compare(o1.getRight(), o2.getRight());
+                }
+            };
+        }
+
         Queue<Pair<Document, Double>> result;
 
         List<String> tokens = new ArrayList<>();
         Map<String, Double> TFIDF4query = new TreeMap<>();
 
         for (String keyword : keywords){
+            if (analyzer.analyze(keyword).isEmpty())
+                continue;
             tokens.add(analyzer.analyze(keyword).get(0));
         }
         Collections.sort(tokens);
@@ -1190,6 +1204,7 @@ public class InvertedIndexManager {
 
             while (length > 0){
                 docListRID docRID = itr.next(copy, false);
+                //System.out.println(docRID);
                 if (docRID.docIdList.isEmpty()){
                     break;
                 }
@@ -1204,12 +1219,12 @@ public class InvertedIndexManager {
                 for (int n = 0; n < positionLength; n++){
                     positionsLength.add(itr.segmentFileBuffer.getInt());
                 }
-
+                //System.out.println(positionsLength);
                 for (int j = 0; j < docRID.docIdList.size(); j++){
                     int docId = docRID.docIdList.get(j);
                     int lengthOfPosition = positionsLength.get(j);
                     double TfIdf = lengthOfPosition * IDF.get(str);
-
+                    //System.out.println("TFIDF:"+TfIdf);
                     if (dotProductAccumulator.containsKey(docId) || vectorLengthAccumulator.containsKey(docId)){
                         dotProductAccumulator.replace(docId, dotProductAccumulator.get(docId) +
                                                         TfIdf * TFIDF4query.get(str));
@@ -1221,7 +1236,8 @@ public class InvertedIndexManager {
                         vectorLengthAccumulator.put(docId, Math.pow(TfIdf, 2));
                     }
                 }
-
+                //System.out.println("dotProductAccumulator:"+dotProductAccumulator);
+                //System.out.println("vectorLengthAccumulator:"+vectorLengthAccumulator);
             }
 
             try {
@@ -1236,9 +1252,13 @@ public class InvertedIndexManager {
             }
 
             for (Integer docId : dotProductAccumulator.keySet()){
-                score.put(docId, dotProductAccumulator.get(docId) / Math.sqrt(vectorLengthAccumulator.get(docId)));
+                if (dotProductAccumulator.get(docId) == 0.0 && vectorLengthAccumulator.get(docId) == 0.0){
+                    score.put(docId, 0.0);
+                }
+                else
+                    score.put(docId, dotProductAccumulator.get(docId) / Math.sqrt(vectorLengthAccumulator.get(docId)));
             }
-
+            //System.out.println(score);
             List<Map.Entry<Integer, Double>> scoreList = new ArrayList<>(score.entrySet());
 
             Collections.sort(scoreList, new Comparator<Map.Entry<Integer, Double>>() {
@@ -1246,13 +1266,17 @@ public class InvertedIndexManager {
                 public int compare(Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2) {
                     if (o1.getValue() < o2.getValue())
                         return 1;
-                    else if (o1.getValue().equals(o2.getValue()))
-                        return 0;
-                    else
+                    else if (o1.getValue() > o2.getValue())
                         return -1;
+                    else if (o1.getValue().equals(o2.getValue()) && o1.getKey() > o2.getKey())
+                        return -1;
+                    else if (o1.getValue().equals(o2.getValue()) && o1.getKey() < o2.getKey())
+                        return 1;
+                    else
+                        return 0;
                 }
             });
-
+            //System.out.println(scoreList);
             List<Map.Entry<Integer, Double>> maxKScores;
             if (topK == null)
                 maxKScores = scoreList;
@@ -1260,13 +1284,12 @@ public class InvertedIndexManager {
                     maxKScores = scoreList;
                 else
                     maxKScores = scoreList.subList(0, topK);
-
+            //System.out.println(maxKScores);
             DocumentStore documentStore = MapdbDocStore.createOrOpenReadOnly(getDocumentStorePathString(segmentId));
             for (Map.Entry<Integer, Double> entry : maxKScores){
                 Document document = documentStore.getDocument(entry.getKey());
                 Pair<Document, Double> pair = new Pair<>(document, entry.getValue());
                 result.offer(pair);
-
                 if (topK != null) {
                     while (result.size() > topK)
                         result.poll();
@@ -1275,7 +1298,7 @@ public class InvertedIndexManager {
 
             documentStore.close();
         }
-
+        //System.out.println(result);
         List<Pair<Document, Double>> temp = new ArrayList<>();
         List<Pair<Document, Double>> finalResult = new ArrayList<>();
         while (result.size() > 0){
@@ -1284,6 +1307,7 @@ public class InvertedIndexManager {
         for (int m = temp.size() - 1; m >= 0; m--){
             finalResult.add(temp.get(m));
         }
+        //System.out.println(finalResult);
         return finalResult.iterator();
 
     }

@@ -88,12 +88,13 @@ public class Team9TfidfTest {
         }
         assertEquals(20, invertedIndex.getDocumentFrequency(0, analyzer.analyze("travel").get(0)));
         assertEquals(4, invertedIndex.getDocumentFrequency(0, analyzer.analyze("tourism").get(0)));
-        List<String> phrase = new ArrayList<>(Arrays.asList("travel", "international", "internal", "tourism"));
+        List<String> phrase = new ArrayList<>(Arrays.asList("travel", "local", "international", "internal", "tourism"));
         Iterator<Pair<Document, Double>> res = invertedIndex.searchTfIdf(phrase, 10);
         int count = 0;
-        String expect = "In some countries, non-local internal travel may require an internal passport, while international travel typically requires a passport and visa.";
+        String expect = "Travel may be local, regional, national domestic or international.";
         while (res.hasNext()) {
-            assertEquals(expect, res.next().getLeft().getText());
+            Pair<Document, Double> result = res.next();
+            assertEquals(expect, result.getLeft().getText());
             count ++;
         }
         assertEquals(10, count);
@@ -121,7 +122,9 @@ public class Team9TfidfTest {
         expect.add("mollush animal sea snail clam mussel jellyfish shell mussel");
         expect.add("homothermal animal human bear deer monkey rabbit panda cat dog penguin dolphin");
         while (res.hasNext()) {
-            resDoc.add(res.next().getLeft().getText());
+            Pair<Document, Double> result = res.next();
+            System.out.println(result);
+            resDoc.add(result.getLeft().getText());
             count ++;
         }
         assertEquals(2, count);

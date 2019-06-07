@@ -33,7 +33,7 @@ public class Team2TfIdfTest {
 
     @After
     public void clear(){
-        File dir = new File("./ranking/Team2TfIdfTest");
+        File dir = new File("./index/Team2TfIdfTest");
         for (File file: dir.listFiles()){
             if (!file.isDirectory()){
                 file.delete();
