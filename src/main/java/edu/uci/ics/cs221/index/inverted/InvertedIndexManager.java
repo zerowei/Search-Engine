@@ -1100,7 +1100,7 @@ public class InvertedIndexManager {
 
     public static class CompareResults implements Comparator<Pair<Document, Double>> {
         @Override public int compare(Pair<Document, Double> o1, Pair<Document, Double> o2) {
-            int compareValue = o1.getRight().compareTo(o2.getRight());
+            int compareValue = o2.getRight().compareTo(o1.getRight());
             if (compareValue != 0) {
                 return compareValue;
             }

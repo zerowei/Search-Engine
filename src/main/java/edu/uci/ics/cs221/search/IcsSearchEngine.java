@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+import static java.lang.Math.min;
+
 public class IcsSearchEngine {
     private Path documentDirectory;
     private InvertedIndexManager indexManager;
@@ -51,7 +53,7 @@ public class IcsSearchEngine {
         Arrays.sort(files, new SortbyFileName());
 
         numWebpages = files.length;
-        System.out.println("num web pages " + numWebpages);
+        //System.out.println("num web pages " + numWebpages);
 
         for (int i = 0; i < numWebpages; i++) {
             File file = files[i];
@@ -193,6 +195,6 @@ public class IcsSearchEngine {
         }
 
         result.sort(new InvertedIndexManager.CompareResults());
-        return result.subList(0, topK).iterator();
+        return result.subList(0, min(topK, result.size())).iterator();
     }
 }
