@@ -88,7 +88,6 @@ public class Team6AndSearchTest {
 
         while(ite.hasNext()){
             Document cur = ite.next();
-            System.out.println(cur);
             if(expectedDocs.contains(cur))
             {
                 expectedDocs.remove(cur);

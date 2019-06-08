@@ -20,18 +20,22 @@ import static org.junit.Assert.assertTrue;
 /*
 - What's your team number?
     Team 6
+
 - What is the functionality being tested?
     The effect of Delta-compression in building positional index
     Method:
         compare the IO counters between non-compression and compression
+
 - Describe your tests briefly:
     To compare the difference, we need to set up two different index managers.
     In test1:
         We test while writing documents to disk, the difference between IO counters
     In test2:
         We test while searching for phrase in document, the difference between IO counters
+
 - Does each test case have comments/documentation?
     Yes
+
  */
 
 public class Team6IndexCompressionTest {
@@ -65,7 +69,7 @@ public class Team6IndexCompressionTest {
      *  We assume the compressed one will be 2/3 smaller than non-compressed one
      *  search the phase and compare read counters
      *  We assume the compressed one will be 2/3 smaller than non-compressed one
-     * */
+    * */
 
     @Test
     public void test1() {
@@ -105,7 +109,7 @@ public class Team6IndexCompressionTest {
     }
 
     /**
-     This testcase is to test the empty input document. The write counter of
+    This testcase is to test the empty input document. The write counter of
      compressed and non-compressed should be the same number.
      * */
 

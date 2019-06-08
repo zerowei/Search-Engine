@@ -67,9 +67,9 @@ public class Team11PhraseSearchTest {
     }
 
     /*
-     * Test1 tests an easy case with only 1 segment and it has 1 document. We test if we
-     * can get the right result.
-     **/
+    * Test1 tests an easy case with only 1 segment and it has 1 document. We test if we
+    * can get the right result.
+    **/
     @Test
     public void PhraseSearchTest1(){
         InvertedIndexManager.DEFAULT_FLUSH_THRESHOLD = 1;

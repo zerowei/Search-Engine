@@ -27,7 +27,7 @@ public class Team5IndexCompressionTest {
   private String path1 = "./index/Team5IndexCompressionTest/naive_compress";
   private String path2 = "./index/Team5IndexCompressionTest/compress";
   private Analyzer analyzer =
-          new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
+      new ComposableAnalyzer(new PunctuationTokenizer(), new PorterStemmer());
   private InvertedIndexManager positional_list_naive_compressor;
   private InvertedIndexManager positional_list_compressor;
 
@@ -42,9 +42,9 @@ public class Team5IndexCompressionTest {
       directory2.mkdirs();
     }
     positional_list_naive_compressor =
-            InvertedIndexManager.createOrOpenPositional(path1, analyzer, naivecompressor);
+        InvertedIndexManager.createOrOpenPositional(path1, analyzer, naivecompressor);
     positional_list_compressor =
-            InvertedIndexManager.createOrOpenPositional(path2, analyzer, compressor);
+        InvertedIndexManager.createOrOpenPositional(path2, analyzer, compressor);
     PageFileChannel.resetCounters();
   }
 
@@ -92,11 +92,11 @@ public class Team5IndexCompressionTest {
 
     for (int i = 0; i < 3000; i++) {
       positional_list_naive_compressor.addDocument(
-              new Document("cat Dot cat Dog I can not tell the difference between cat and Dog"));
+          new Document("cat Dot cat Dog I can not tell the difference between cat and Dog"));
       positional_list_naive_compressor.addDocument(
-              new Document("cat and dog have a lot of difference"));
+          new Document("cat and dog have a lot of difference"));
       positional_list_naive_compressor.addDocument(
-              new Document("Dog can be very different from cat"));
+          new Document("Dog can be very different from cat"));
     }
     positional_list_naive_compressor.flush();
     for (int i = 0; i < positional_list_naive_compressor.getNumSegments(); i++) {
@@ -108,7 +108,7 @@ public class Team5IndexCompressionTest {
 
     for (int i = 0; i < 3000; i++) {
       positional_list_compressor.addDocument(
-              new Document("cat Dot cat Dog I can not tell the difference between cat and Dog"));
+          new Document("cat Dot cat Dog I can not tell the difference between cat and Dog"));
       positional_list_compressor.addDocument(new Document("cat and dog have a lot of difference"));
       positional_list_compressor.addDocument(new Document("Dog can be very different from cat"));
     }
@@ -139,19 +139,19 @@ public class Team5IndexCompressionTest {
     Assert.assertEquals(0, PageFileChannel.writeCounter);
     for (int i = 0; i < 3000; i++) {
       positional_list_naive_compressor.addDocument(
-              new Document("cat" + " cat" + " cat" + " and dog" + " dog" + " dog"));
+          new Document("cat" + " cat" + " cat" + " and dog" + " dog" + " dog"));
       positional_list_naive_compressor.addDocument(
-              new Document("pepsi" + " pepsi" + " pepsi" + " or coke" + " coke" + " coke"));
+          new Document("pepsi" + " pepsi" + " pepsi" + " or coke" + " coke" + " coke"));
       positional_list_naive_compressor.addDocument(
-              new Document(
-                      "microsoft"
-                              + " microsoft"
-                              + i
-                              + " microsoft"
-                              + " vs apple"
-                              + " apple"
-                              + " apple"
-                              + i));
+          new Document(
+              "microsoft"
+                  + " microsoft"
+                  + i
+                  + " microsoft"
+                  + " vs apple"
+                  + " apple"
+                  + " apple"
+                  + i));
     }
     positional_list_naive_compressor.flush();
     for (int i = 0; i < positional_list_naive_compressor.getNumSegments(); i++) {
@@ -163,19 +163,19 @@ public class Team5IndexCompressionTest {
 
     for (int i = 0; i < 3000; i++) {
       positional_list_compressor.addDocument(
-              new Document("cat" + " cat" + " cat" + " and dog" + " dog" + " dog"));
+          new Document("cat" + " cat" + " cat" + " and dog" + " dog" + " dog"));
       positional_list_compressor.addDocument(
-              new Document("pepsi" + " pepsi" + " pepsi" + " or coke" + " coke" + " coke"));
+          new Document("pepsi" + " pepsi" + " pepsi" + " or coke" + " coke" + " coke"));
       positional_list_compressor.addDocument(
-              new Document(
-                      "microsoft"
-                              + " microsoft"
-                              + i
-                              + " microsoft"
-                              + " vs apple"
-                              + " apple"
-                              + " apple"
-                              + i));
+          new Document(
+              "microsoft"
+                  + " microsoft"
+                  + i
+                  + " microsoft"
+                  + " vs apple"
+                  + " apple"
+                  + " apple"
+                  + i));
     }
     positional_list_compressor.flush();
     for (int i = 0; i < positional_list_compressor.getNumSegments(); i++) {
