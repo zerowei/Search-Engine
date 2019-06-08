@@ -192,7 +192,7 @@ public class InvertedIndexManager {
 
         numDocuments += 1;
         if (numDocuments == DEFAULT_FLUSH_THRESHOLD) {
-            System.out.println("flushing...");
+            //System.out.println("flushing...");
             flush();
         }
 
@@ -320,7 +320,7 @@ public class InvertedIndexManager {
         numSegments += 1;
 
         if (numSegments == InvertedIndexManager.DEFAULT_MERGE_THRESHOLD) {
-            System.out.println("merging...");
+            //System.out.println("merging...");
             mergeAllSegments();
         }
     }

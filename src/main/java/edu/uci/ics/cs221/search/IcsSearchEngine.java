@@ -58,7 +58,7 @@ public class IcsSearchEngine {
         for (int i = 0; i < numWebpages; i++) {
             File file = files[i];
             try {
-                System.out.println(file.getPath());
+                //System.out.println(file.getPath());
                 String content = new String(Files.readAllBytes(Paths.get(file.getPath())));
                 indexManager.addDocument(new Document(content));
             } catch (IOException e) {
@@ -188,8 +188,8 @@ public class IcsSearchEngine {
         while (it.hasNext()) {
             Pair<Document, Double> pair = it.next();
             int documentId = getDocumentId(pair.getLeft().getText());
-            System.out.println("document id " + getDocumentId(pair.getLeft().getText()));
-            System.out.println("right " + pair.getRight() + " PR " + currentPR.get(documentId));
+            //System.out.println("document id " + getDocumentId(pair.getLeft().getText()));
+            //System.out.println("right " + pair.getRight() + " PR " + currentPR.get(documentId));
             double score = pair.getRight() + pageRankWeight * currentPR.get(documentId);
             result.add(new Pair<>(pair.getLeft(), score));
         }

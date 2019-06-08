@@ -115,7 +115,7 @@ public class WordBreakTokenizer implements Tokenizer {
         // Reference: https://stackoverflow.com/questions/6026813/converting-string-array-to-java-util-list
         List<String> results = new ArrayList<>(Arrays.asList(cache[0][len-1].split(" ")));
         results.removeAll(StopWords.stopWords);
-        System.out.println(results);
+        //System.out.println(results);
         return results;
     }
 }
