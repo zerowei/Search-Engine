@@ -165,29 +165,31 @@ public class InvertedIndexManager {
 
         documents.put(numDocuments, document);
         List<String> tokens = analyzer.analyze(document.getText());
+
+        Map<String, List<Integer>> localIndexes = new TreeMap<>();
+
         for (int tokenPosition = 0; tokenPosition < tokens.size(); tokenPosition++) {
             String token = tokens.get(tokenPosition);
-            List<Integer> documentIds;
-            InvertedIndex index;
+            if (localIndexes.containsKey(token)) {
+                localIndexes.get(token).add(tokenPosition);
+            } else {
+                List<Integer> p = new LinkedList<>();
+                p.add(tokenPosition);
+                localIndexes.put(token, p);
+            }
+        }
 
+        for (String token : localIndexes.keySet()) {
             if (indexes.containsKey(token)) {
-                index = indexes.get(token);
-                documentIds = new ArrayList<>(index.docPositions.keySet());
-                if (documentIds.get(documentIds.size() - 1).equals(numDocuments) == false) {
-                    index.docPositions.put(numDocuments, Arrays.asList(tokenPosition));
-                }
-                else {
-                    List<Integer> positions = new ArrayList<>(index.docPositions.get(numDocuments));
-                    positions.add(tokenPosition);
-                    index.docPositions.put(numDocuments, positions);
-                }
+                InvertedIndex index = indexes.get(token);
+                index.docPositions.put(numDocuments, localIndexes.get(token));
             } else {
                 Map<Integer, List<Integer>> docPositions = new TreeMap<>();
-                docPositions.put(numDocuments, Arrays.asList(tokenPosition));
-                index = new InvertedIndex(token, docPositions);
+                docPositions.put(numDocuments, localIndexes.get(token));
+                InvertedIndex index = new InvertedIndex(token, docPositions);
                 indexes.put(token, index);
             }
-            //System.out.println(indexes);
+
         }
 
         numDocuments += 1;
