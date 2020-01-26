@@ -1,4 +1,4 @@
-# CS221-Project
+# CS221-Project-Search Engine
 
 ## Team Member
 
